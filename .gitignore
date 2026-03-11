@@ -1,0 +1,35 @@
+# CMake
+build/
+out/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+*.cmake
+
+# Visual Studio
+.vs/
+*.user
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.VC.db
+*.VC.VC.opendb
+*.suo
+*.opensdf
+*.sdf
+
+# Временные файлы
+*.o
+*.obj
+*.exe
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.dll
+
+# Тесты и вывод
+temp.txt
+tokens.txt
+bool.txt
+error.txt
