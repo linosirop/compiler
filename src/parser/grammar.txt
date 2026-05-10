@@ -1,0 +1,81 @@
+Program        ::= { Declaration }
+
+Declaration    ::= FunctionDecl
+                 | StructDecl
+                 | VarDecl
+
+FunctionDecl   ::= "fn" Identifier "(" [ Parameters ] ")" [ "->" Type ] Block
+StructDecl     ::= "struct" Identifier "{" { VarDecl } "}"
+VarDecl        ::= Type Identifier [ "=" Expression ] ";"
+
+Statement      ::= Block
+                 | IfStmt
+                 | WhileStmt
+                 | ForStmt
+                 | ReturnStmt
+                 | VarDecl
+                 | ExprStmt
+                 | EmptyStmt
+
+Block          ::= "{" { Statement } "}"
+IfStmt         ::= "if" "(" Expression ")" Statement [ "else" Statement ]
+WhileStmt      ::= "while" "(" Expression ")" Statement
+ForStmt        ::= "for" "(" ForInit [ Expression ] ";" [ Expression ] ")" Statement
+ForInit        ::= ";"
+                 | VarDecl
+                 | ExprStmt
+ReturnStmt     ::= "return" [ Expression ] ";"
+ExprStmt       ::= Expression ";"
+EmptyStmt      ::= ";"
+
+Expression     ::= Assignment
+
+Assignment     ::= LogicalOr [ AssignmentOperator Assignment ]
+AssignmentOperator ::= "=" | "+=" | "-=" | "*=" | "/="
+
+LogicalOr      ::= LogicalAnd { "||" LogicalAnd }
+LogicalAnd     ::= Equality { "&&" Equality }
+
+Equality       ::= Relational [ ( "==" | "!=" ) Relational ]
+Relational     ::= Additive [ ( "<" | "<=" | ">" | ">=" ) Additive ]
+
+Additive       ::= Multiplicative { ( "+" | "-" ) Multiplicative }
+Multiplicative ::= Unary { ( "*" | "/" | "%" ) Unary }
+Unary          ::= ( "-" | "!" ) Unary
+                 | Primary
+
+Primary        ::= Literal
+                 | Identifier
+                 | Call
+                 | "(" Expression ")"
+Call           ::= Identifier "(" [ Arguments ] ")"
+Arguments      ::= Expression { "," Expression }
+
+Type           ::= "int" | "float" | "bool" | "void" | Identifier
+Parameters     ::= Parameter { "," Parameter }
+Parameter      ::= Type Identifier
+
+Literal        ::= IntegerLiteral
+                 | FloatLiteral
+                 | StringLiteral
+                 | BooleanLiteral
+
+BooleanLiteral ::= "true" | "false"
+
+# Precedence and associativity, highest to lowest:
+# 1. Primary expressions: literals, identifiers, calls, parenthesized expressions
+# 2. Unary operators: -, !                         right-associative
+# 3. Multiplicative operators: *, /, %             left-associative
+# 4. Additive operators: +, -                      left-associative
+# 5. Relational operators: <, <=, >, >=            non-associative
+# 6. Equality operators: ==, !=                    non-associative
+# 7. Logical AND: &&                               left-associative
+# 8. Logical OR: ||                                left-associative
+# 9. Assignment: =, +=, -=, *=, /=                 right-associative
+
+# Notes:
+# - Chained comparisons such as 1 < 2 < 3 are syntax errors.
+# - Chained equality such as a == b == c is a syntax error.
+# - Assignment targets must be identifiers in the current implementation.
+# - The dangling else problem is resolved by attaching else to the nearest preceding if.
+# - Basic parser recovery synchronizes at semicolons, braces, declarations, and statement starts.

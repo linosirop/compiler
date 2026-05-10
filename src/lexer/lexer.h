@@ -28,7 +28,7 @@ private:
     size_t token_index_ = 0;
     std::vector<std::string> errors_;
 
-    // Вспомогательные методы
+    // Helper methods
     char advance();
     char peek() const;
     char peek_next() const;
@@ -46,4 +46,5 @@ private:
     void scan_string();
 
     void report_error(const std::string& message);
+    void report_error_at(int line, int column, const std::string& message);
 };

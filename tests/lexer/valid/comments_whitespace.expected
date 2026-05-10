@@ -1,0 +1,7 @@
+2:1 KW_INT "int"
+2:5 IDENTIFIER "x"
+2:6 SEMICOLON ";"
+3:1 KW_FLOAT "float"
+3:7 IDENTIFIER "y"
+3:8 SEMICOLON ";"
+4:0 END_OF_FILE ""

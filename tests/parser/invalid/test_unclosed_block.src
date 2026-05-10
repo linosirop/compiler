@@ -1,0 +1,5 @@
+fn main() {
+    int x = 5;
+    if (x > 1) {
+        int y = 10;
+}

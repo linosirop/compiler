@@ -1,0 +1,32 @@
+Program [line 1, column 1]:
+  Declarations:
+    FunctionDecl [line 1, column 1]:
+      Name: main
+      ReturnType: void
+      Parameters:
+        []
+      Body:
+        BlockStmt [line 1, column 11]:
+          Statements:
+            VarDeclStmt [line 2, column 5]:
+              Type: int
+              Name: x
+              Initializer:
+                BinaryExpr [line 2, column 15]:
+                  Operator: +
+                  Left:
+                    LiteralExpr [line 2, column 13]:
+                      Value: 1
+                  Right:
+                    BinaryExpr [line 2, column 19]:
+                      Operator: *
+                      Left:
+                        LiteralExpr [line 2, column 17]:
+                          Value: 2
+                      Right:
+                        LiteralExpr [line 2, column 21]:
+                          Value: 3
+            ReturnStmt [line 3, column 5]:
+              Value:
+                IdentifierExpr [line 3, column 12]:
+                  Name: x

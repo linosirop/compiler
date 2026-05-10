@@ -32,6 +32,9 @@ std::string Token::to_string() const {
     case TokenType::SLASH:        oss << "SLASH";        break;
     case TokenType::PERCENT:      oss << "PERCENT";      break;
     case TokenType::AMPERSAND:    oss << "AMPERSAND";    break;
+    case TokenType::AND_AND:      oss << "AND_AND";      break;
+    case TokenType::OR_OR:        oss << "OR_OR";        break;
+    case TokenType::BANG:         oss << "BANG";         break;
     case TokenType::EQUAL_EQUAL:  oss << "EQUAL_EQUAL";  break;
     case TokenType::BANG_EQUAL:   oss << "BANG_EQUAL";   break;
     case TokenType::LESS:         oss << "LESS";         break;
@@ -39,14 +42,21 @@ std::string Token::to_string() const {
     case TokenType::GREATER:      oss << "GREATER";      break;
     case TokenType::GREATER_EQUAL:oss << "GREATER_EQUAL"; break;
     case TokenType::PLUS_EQUAL:   oss << "PLUS_EQUAL";   break;
+    case TokenType::MINUS_EQUAL:  oss << "MINUS_EQUAL";  break;
+    case TokenType::STAR_EQUAL:   oss << "STAR_EQUAL";   break;
+    case TokenType::SLASH_EQUAL:  oss << "SLASH_EQUAL";  break;
     case TokenType::ASSIGN:       oss << "ASSIGN";       break;
+    case TokenType::ARROW:        oss << "ARROW";        break;
 
     case TokenType::LPAREN:    oss << "LPAREN";    break;
     case TokenType::RPAREN:    oss << "RPAREN";    break;
     case TokenType::LBRACE:    oss << "LBRACE";    break;
     case TokenType::RBRACE:    oss << "RBRACE";    break;
+    case TokenType::LBRACKET:  oss << "LBRACKET";  break;
+    case TokenType::RBRACKET:  oss << "RBRACKET";  break;
     case TokenType::SEMICOLON: oss << "SEMICOLON"; break;
     case TokenType::COMMA:     oss << "COMMA";     break;
+    case TokenType::COLON:     oss << "COLON";     break;
 
     case TokenType::END_OF_FILE: oss << "END_OF_FILE"; break;
     }

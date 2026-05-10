@@ -17,13 +17,13 @@ enum class TokenType {
     IDENTIFIER,
 
     PLUS, MINUS, STAR, SLASH, PERCENT,
-    AMPERSAND,
+    AMPERSAND, AND_AND, OR_OR, BANG,
     EQUAL_EQUAL, BANG_EQUAL,
     LESS, LESS_EQUAL, GREATER, GREATER_EQUAL,
-    PLUS_EQUAL, ASSIGN,
+    PLUS_EQUAL, MINUS_EQUAL, STAR_EQUAL, SLASH_EQUAL, ASSIGN, ARROW,
 
     LPAREN, RPAREN, LBRACE, RBRACE,
-    SEMICOLON, COMMA,
+    LBRACKET, RBRACKET, SEMICOLON, COMMA, COLON,
 
     END_OF_FILE
 };
@@ -33,7 +33,7 @@ struct Token {
     std::string lexeme;
     std::variant<std::monostate, long long, double, bool, std::string> literal;
     int line;
-    int column;  // позиция начала токена
+    int column;
 
     std::string to_string() const;
 };

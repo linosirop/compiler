@@ -1,4 +1,3 @@
-# CMakeLists.txt
 cmake_minimum_required(VERSION 3.15)
 project(MiniCompiler LANGUAGES CXX)
 
@@ -6,38 +5,61 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Warnings
-if (MSVC)
-    add_compile_options(/W4 /WX)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
-endif()
+option(BUILD_TESTS "Build standalone project tests" ON)
+option(TREAT_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
 
-# Core library
 add_library(compiler_core STATIC
     src/lexer/token.cpp
     src/lexer/lexer.cpp
-    # Add preprocessor if implementing stretch
+    src/parser/ast.cpp
+    src/parser/parser.cpp
 )
 
 target_include_directories(compiler_core PUBLIC src)
 
-# Executable
+if (MSVC)
+    target_compile_options(compiler_core PRIVATE /W4)
+else()
+    target_compile_options(compiler_core PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+if (TREAT_WARNINGS_AS_ERRORS)
+    if (MSVC)
+        target_compile_options(compiler_core PRIVATE /WX)
+    else()
+        target_compile_options(compiler_core PRIVATE -Werror)
+    endif()
+endif()
+
 add_executable(compiler src/main.cpp)
 target_link_libraries(compiler PRIVATE compiler_core)
 
-# Tests
-enable_testing()
-include(FetchContent)
-FetchContent_Declare(
-    googletest
-    URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
-)
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
+if (MSVC)
+    target_compile_options(compiler PRIVATE /W4)
+else()
+    target_compile_options(compiler PRIVATE -Wall -Wextra -Wpedantic)
+endif()
 
-add_executable(lexer_tests tests/lexer_test.cpp)
-target_link_libraries(lexer_tests PRIVATE compiler_core GTest::gtest_main)
-add_test(NAME LexerTests COMMAND lexer_tests)
+if (TREAT_WARNINGS_AS_ERRORS)
+    if (MSVC)
+        target_compile_options(compiler PRIVATE /WX)
+    else()
+        target_compile_options(compiler PRIVATE -Werror)
+    endif()
+endif()
 
-# For file-based tests, we can add a custom target or use a script, but for simplicity, use GTest to run file tests too
+if (BUILD_TESTS)
+    enable_testing()
+
+    if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/core_tests.cpp")
+        add_executable(core_tests tests/core_tests.cpp)
+        target_link_libraries(core_tests PRIVATE compiler_core)
+        add_test(NAME CoreTests COMMAND core_tests)
+    endif()
+
+    if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/core_tests_extended.cpp")
+        add_executable(core_tests_extended tests/core_tests_extended.cpp)
+        target_link_libraries(core_tests_extended PRIVATE compiler_core)
+        add_test(NAME CoreTestsExtended COMMAND core_tests_extended)
+    endif()
+endif()

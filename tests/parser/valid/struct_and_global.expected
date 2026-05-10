@@ -1,0 +1,35 @@
+Program [line 1, column 1]:
+  Declarations:
+    StructDecl [line 1, column 1]:
+      Name: Point
+      Fields:
+        VarDeclStmt [line 2, column 5]:
+          Type: int
+          Name: x
+          Initializer:
+            null
+        VarDeclStmt [line 3, column 5]:
+          Type: int
+          Name: y
+          Initializer:
+            null
+    GlobalVarDecl [line 6, column 1]:
+      VarDeclStmt [line 6, column 1]:
+        Type: int
+        Name: global
+        Initializer:
+          LiteralExpr [line 6, column 14]:
+            Value: 10
+    FunctionDecl [line 8, column 1]:
+      Name: main
+      ReturnType: void
+      Parameters:
+        []
+      Body:
+        BlockStmt [line 8, column 11]:
+          Statements:
+            VarDeclStmt [line 9, column 5]:
+              Type: Point
+              Name: p
+              Initializer:
+                null

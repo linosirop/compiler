@@ -1,0 +1,31 @@
+Program [line 1, column 1]:
+  Declarations:
+    FunctionDecl [line 1, column 1]:
+      Name: main
+      ReturnType: void
+      Parameters:
+        []
+      Body:
+        BlockStmt [line 1, column 11]:
+          Statements:
+            IfStmt [line 2, column 5]:
+              Condition:
+                IdentifierExpr [line 2, column 9]:
+                  Name: a
+              Then:
+                IfStmt [line 3, column 9]:
+                  Condition:
+                    IdentifierExpr [line 3, column 13]:
+                      Name: b
+                  Then:
+                    ReturnStmt [line 4, column 13]:
+                      Value:
+                        LiteralExpr [line 4, column 20]:
+                          Value: 1
+                  Else:
+                    ReturnStmt [line 6, column 13]:
+                      Value:
+                        LiteralExpr [line 6, column 20]:
+                          Value: 2
+              Else:
+                null

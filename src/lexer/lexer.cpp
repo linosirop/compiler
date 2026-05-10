@@ -56,12 +56,16 @@ void Lexer::add_token(TokenType type, std::string lexeme,
 }
 
 void Lexer::report_error(const std::string& message) {
+    report_error_at(current_line_, current_column_, message);
+}
+
+void Lexer::report_error_at(int line, int column, const std::string& message) {
     std::ostringstream oss;
-    oss << "Error at " << current_line_ << ":" << current_column_ << ": " << message;
+    oss << "Error at " << line << ":" << column << ": " << message;
     errors_.push_back(oss.str());
 
     // Простое восстановление — пропускаем до конца строки или пробела
-    while (!at_end() && peek() != '\n' && !std::isspace(peek())) {
+    while (!at_end() && peek() != '\n' && !std::isspace(static_cast<unsigned char>(peek()))) {
         advance();
     }
 }
@@ -88,18 +92,22 @@ void Lexer::skip_whitespace_and_comments() {
         }
         if (c == '/' && peek_next() == '*') {  // /*
             advance(); advance();
+            bool closed = false;
             while (!at_end()) {
-                if (peek() == '\n') {
-                    current_line_++;
-                    current_column_ = 1;
-                }
                 if (peek() == '*' && peek_next() == '/') {
                     advance(); advance();
+                    closed = true;
                     break;
+                }
+                if (peek() == '\n') {
+                    advance();
+                    current_line_++;
+                    current_column_ = 1;
+                    continue;
                 }
                 advance();
             }
-            if (at_end()) report_error("Unterminated multi-line comment");
+            if (!closed) report_error("Unterminated multi-line comment");
             continue;
         }
 
@@ -115,7 +123,7 @@ void Lexer::scan_token() {
         return;
     }
 
-    if (std::isalpha(c) || c == '_') {
+    if (std::isalpha(static_cast<unsigned char>(c))) {
         scan_identifier_or_keyword();
         return;
     }
@@ -131,11 +139,28 @@ void Lexer::scan_token() {
         if (peek() == '=') { advance(); add_token(TokenType::PLUS_EQUAL, "+="); }
         else add_token(TokenType::PLUS, "+");
         break;
-    case '-': add_token(TokenType::MINUS, "-"); break;
-    case '*': add_token(TokenType::STAR, "*"); break;
-    case '/': add_token(TokenType::SLASH, "/"); break;
+    case '-':
+        if (peek() == '=') { advance(); add_token(TokenType::MINUS_EQUAL, "-="); }
+        else if (peek() == '>') { advance(); add_token(TokenType::ARROW, "->"); }
+        else add_token(TokenType::MINUS, "-");
+        break;
+    case '*':
+        if (peek() == '=') { advance(); add_token(TokenType::STAR_EQUAL, "*="); }
+        else add_token(TokenType::STAR, "*");
+        break;
+    case '/':
+        if (peek() == '=') { advance(); add_token(TokenType::SLASH_EQUAL, "/="); }
+        else add_token(TokenType::SLASH, "/");
+        break;
     case '%': add_token(TokenType::PERCENT, "%"); break;
-    case '&': add_token(TokenType::AMPERSAND, "&"); break;
+    case '&':
+        if (peek() == '&') { advance(); add_token(TokenType::AND_AND, "&&"); }
+        else add_token(TokenType::AMPERSAND, "&");
+        break;
+    case '|':
+        if (peek() == '|') { advance(); add_token(TokenType::OR_OR, "||"); }
+        else report_error("Unexpected character '|'");
+        break;
 
     case '=':
         if (peek() == '=') { advance(); add_token(TokenType::EQUAL_EQUAL, "=="); }
@@ -144,7 +169,7 @@ void Lexer::scan_token() {
 
     case '!':
         if (peek() == '=') { advance(); add_token(TokenType::BANG_EQUAL, "!="); }
-        else report_error("Unexpected character '!'");
+        else add_token(TokenType::BANG, "!");
         break;
 
     case '<':
@@ -161,11 +186,14 @@ void Lexer::scan_token() {
     case ')': add_token(TokenType::RPAREN, ")"); break;
     case '{': add_token(TokenType::LBRACE, "{"); break;
     case '}': add_token(TokenType::RBRACE, "}"); break;
+    case '[': add_token(TokenType::LBRACKET, "["); break;
+    case ']': add_token(TokenType::RBRACKET, "]"); break;
     case ';': add_token(TokenType::SEMICOLON, ";"); break;
     case ',': add_token(TokenType::COMMA, ","); break;
+    case ':': add_token(TokenType::COLON, ":"); break;
 
     default:
-        report_error(std::string("Unexpected character '") + c + "'");
+        report_error_at(current_line_, current_column_ - 1, std::string("Unexpected character '") + c + "'");
         break;
     }
 }
@@ -177,9 +205,13 @@ void Lexer::scan_number() {
     while (!at_end() && std::isdigit(peek())) advance();
 
     if (peek() == '.') {
+        if (!std::isdigit(static_cast<unsigned char>(peek_next()))) {
+            report_error_at(current_line_, current_column_, "Malformed floating-point literal: expected digit after '.'");
+            return;
+        }
         is_float = true;
         advance();
-        while (!at_end() && std::isdigit(peek())) advance();
+        while (!at_end() && std::isdigit(static_cast<unsigned char>(peek()))) advance();
     }
 
     std::string num_str = source_.substr(start, pos - start);

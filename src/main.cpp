@@ -1,68 +1,131 @@
-// src/main.cpp
-#include <iostream>
 #include <fstream>
+#include <iostream>
+#include <sstream>
 #include <string>
-#include <vector>
 
 #include "lexer/lexer.h"
+#include "parser/parser.h"
+#include "parser/ast.h"
+
+namespace {
+std::string readFile(const std::string& path) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open input file: " + path);
+    }
+    return std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+}
+
+void writeText(const std::string& path, const std::string& text) {
+    if (path.empty()) {
+        std::cout << text;
+        return;
+    }
+    std::ofstream file(path);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open output file: " + path);
+    }
+    file << text;
+}
+
+void printUsage() {
+    std::cerr << "Usage:\n"
+              << "  compiler lex --input <file.src> --output <tokens.txt>\n"
+              << "  compiler parse --input <file.src> [--ast-format text|dot] [--output-file <file>] [--verbose]\n";
+}
+
+std::string getArg(int argc, char* argv[], const std::string& name, const std::string& defaultValue = "") {
+    for (int i = 1; i + 1 < argc; ++i) {
+        if (argv[i] == name) return argv[i + 1];
+    }
+    return defaultValue;
+}
+
+bool hasArg(int argc, char* argv[], const std::string& name) {
+    for (int i = 1; i < argc; ++i) {
+        if (argv[i] == name) return true;
+    }
+    return false;
+}
+}
 
 int main(int argc, char* argv[]) {
-    if (argc != 6 ||
-        std::string(argv[1]) != "lex" ||
-        std::string(argv[2]) != "--input" ||
-        std::string(argv[4]) != "--output") {
-
-        std::cerr << "Usage: compiler lex --input <input_file.src> --output <output_file.txt>\n";
-        std::cerr << "Example:\n";
-        std::cerr << "  compiler lex --input examples/hello.src --output tokens.txt\n";
-        return 1;
-    }
-
-    std::string input_path = argv[3];
-    std::string output_path = argv[5];
-
-    // Читаем весь исходный файл
-    std::ifstream input_file(input_path, std::ios::binary);
-    if (!input_file.is_open()) {
-        std::cerr << "Ошибка: не удалось открыть файл " << input_path << "\n";
-        return 1;
-    }
-
-    std::string source(
-        (std::istreambuf_iterator<char>(input_file)),
-        std::istreambuf_iterator<char>()
-    );
-
-    // Запускаем лексер
-    Lexer lexer(source);
-
-    // Проверяем, были ли ошибки во время лексического анализа
-    const auto& errors = lexer.get_errors();
-    if (!errors.empty()) {
-        std::cerr << "Обнаружены ошибки лексического анализа:\n";
-        for (const auto& err : errors) {
-            std::cerr << err << "\n";
+    try {
+        if (argc < 2) {
+            printUsage();
+            return 1;
         }
+
+        std::string command = argv[1];
+        std::string inputPath = getArg(argc, argv, "--input");
+        if (inputPath.empty()) {
+            printUsage();
+            return 1;
+        }
+
+        std::string source = readFile(inputPath);
+        Lexer lexer(source);
+
+        const auto& lexErrors = lexer.get_errors();
+        if (!lexErrors.empty()) {
+            std::cerr << "Lexical errors:\n";
+            for (const auto& err : lexErrors) std::cerr << err << "\n";
+            return 1;
+        }
+
+        if (command == "lex") {
+            std::string outputPath = getArg(argc, argv, "--output");
+            if (outputPath.empty()) {
+                printUsage();
+                return 1;
+            }
+
+            std::ostringstream out;
+            for (const auto& tok : lexer.all_tokens()) out << tok.to_string() << "\n";
+            writeText(outputPath, out.str());
+            std::cout << "Tokens written to " << outputPath << "\n";
+            return 0;
+        }
+
+        if (command == "parse") {
+            Parser parser(lexer.all_tokens());
+            ProgramNode program = parser.parse();
+
+            const auto& parseErrors = parser.get_errors();
+            if (!parseErrors.empty()) {
+                std::cerr << "Syntax errors:\n";
+                for (const auto& err : parseErrors) std::cerr << err << "\n";
+                return 1;
+            }
+
+            std::string format = getArg(argc, argv, "--ast-format", "text");
+            if (format == "") format = getArg(argc, argv, "--format", "text");
+            std::string outputPath = getArg(argc, argv, "--output-file");
+            if (outputPath.empty()) outputPath = getArg(argc, argv, "--output");
+
+            std::ostringstream out;
+            if (format == "text") {
+                printAstText(program, out);
+            } else if (format == "dot") {
+                printAstDot(program, out);
+            } else {
+                std::cerr << "Unsupported AST format: " << format << "\n";
+                return 1;
+            }
+
+            writeText(outputPath, out.str());
+            if (!outputPath.empty()) std::cout << "AST written to " << outputPath << "\n";
+            if (hasArg(argc, argv, "--verbose")) {
+                std::cout << "Tokens: " << lexer.all_tokens().size() << "\n";
+                std::cout << "Declarations: " << program.declarations.size() << "\n";
+            }
+            return 0;
+        }
+
+        printUsage();
+        return 1;
+    } catch (const std::exception& ex) {
+        std::cerr << "Error: " << ex.what() << "\n";
         return 1;
     }
-
-    // Записываем токены в выходной файл
-    std::ofstream output_file(output_path);
-    if (!output_file.is_open()) {
-        std::cerr << "Ошибка: не удалось создать/открыть файл " << output_path << "\n";
-        return 1;
-    }
-
-    const auto& tokens = lexer.all_tokens();
-
-    for (const auto& tok : tokens) {
-        output_file << tok.to_string() << "\n";
-    }
-
-    output_file.close();
-
-    std::cout << "Токены успешно записаны в " << output_path << "\n";
-    std::cout << "Всего токенов: " << tokens.size() << "\n";
-
-    return 0;
 }

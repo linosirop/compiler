@@ -1,0 +1,4 @@
+1:1 STRING_LITERAL ""hello"" "hello"
+1:9 STRING_LITERAL ""hello world"" "hello world"
+1:23 STRING_LITERAL """" ""
+2:0 END_OF_FILE ""

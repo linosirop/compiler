@@ -1,0 +1,98 @@
+Program [line 1, column 1]:
+  Declarations:
+    FunctionDecl [line 1, column 1]:
+      Name: main
+      ReturnType: void
+      Parameters:
+        []
+      Body:
+        BlockStmt [line 1, column 11]:
+          Statements:
+            VarDeclStmt [line 2, column 5]:
+              Type: int
+              Name: i
+              Initializer:
+                LiteralExpr [line 2, column 13]:
+                  Value: 0
+            WhileStmt [line 3, column 5]:
+              Condition:
+                BinaryExpr [line 3, column 14]:
+                  Operator: <
+                  Left:
+                    IdentifierExpr [line 3, column 12]:
+                      Name: i
+                  Right:
+                    LiteralExpr [line 3, column 16]:
+                      Value: 3
+              Body:
+                BlockStmt [line 3, column 19]:
+                  Statements:
+                    ExprStmt [line 4, column 11]:
+                      Expression:
+                        AssignmentExpr [line 4, column 11]:
+                          Operator: =
+                          Target:
+                            IdentifierExpr [line 4, column 9]:
+                              Name: i
+                          Value:
+                            BinaryExpr [line 4, column 15]:
+                              Operator: +
+                              Left:
+                                IdentifierExpr [line 4, column 13]:
+                                  Name: i
+                              Right:
+                                LiteralExpr [line 4, column 17]:
+                                  Value: 1
+            ForStmt [line 6, column 5]:
+              Init:
+                VarDeclStmt [line 6, column 10]:
+                  Type: int
+                  Name: j
+                  Initializer:
+                    LiteralExpr [line 6, column 18]:
+                      Value: 0
+              Condition:
+                BinaryExpr [line 6, column 23]:
+                  Operator: <
+                  Left:
+                    IdentifierExpr [line 6, column 21]:
+                      Name: j
+                  Right:
+                    LiteralExpr [line 6, column 25]:
+                      Value: 3
+              Update:
+                AssignmentExpr [line 6, column 30]:
+                  Operator: =
+                  Target:
+                    IdentifierExpr [line 6, column 28]:
+                      Name: j
+                  Value:
+                    BinaryExpr [line 6, column 34]:
+                      Operator: +
+                      Left:
+                        IdentifierExpr [line 6, column 32]:
+                          Name: j
+                      Right:
+                        LiteralExpr [line 6, column 36]:
+                          Value: 1
+              Body:
+                BlockStmt [line 6, column 39]:
+                  Statements:
+                    IfStmt [line 7, column 9]:
+                      Condition:
+                        BinaryExpr [line 7, column 15]:
+                          Operator: ==
+                          Left:
+                            IdentifierExpr [line 7, column 13]:
+                              Name: j
+                          Right:
+                            LiteralExpr [line 7, column 18]:
+                              Value: 2
+                      Then:
+                        BlockStmt [line 7, column 21]:
+                          Statements:
+                            ReturnStmt [line 8, column 13]:
+                              Value:
+                                null
+                      Else:
+                        null
