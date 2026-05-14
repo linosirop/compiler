@@ -1,11 +1,13 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 #include "parser/ast.h"
+#include "semantic/analyzer.h"
 
 namespace {
 std::string readFile(const std::string& path) {
@@ -31,7 +33,9 @@ void writeText(const std::string& path, const std::string& text) {
 void printUsage() {
     std::cerr << "Usage:\n"
               << "  compiler lex --input <file.src> --output <tokens.txt>\n"
-              << "  compiler parse --input <file.src> [--ast-format text|dot] [--output-file <file>] [--verbose]\n";
+              << "  compiler parse --input <file.src> [--ast-format text|dot] [--output-file <file>] [--verbose]\n"
+              << "  compiler check --input <file.src> [--output-file <file>] [--show-types] [--verbose]\n"
+              << "  compiler symbols --input <file.src> [--output-file <file>]\n";
 }
 
 std::string getArg(int argc, char* argv[], const std::string& name, const std::string& defaultValue = "") {
@@ -46,6 +50,26 @@ bool hasArg(int argc, char* argv[], const std::string& name) {
         if (argv[i] == name) return true;
     }
     return false;
+}
+
+bool lexAndParse(const std::string& source, ProgramNode& program) {
+    Lexer lexer(source);
+    const auto& lexErrors = lexer.get_errors();
+    if (!lexErrors.empty()) {
+        std::cerr << "Lexical errors:\n";
+        for (const auto& err : lexErrors) std::cerr << err << "\n";
+        return false;
+    }
+
+    Parser parser(lexer.all_tokens());
+    program = parser.parse();
+    const auto& parseErrors = parser.get_errors();
+    if (!parseErrors.empty()) {
+        std::cerr << "Syntax errors:\n";
+        for (const auto& err : parseErrors) std::cerr << err << "\n";
+        return false;
+    }
+    return true;
 }
 }
 
@@ -75,6 +99,7 @@ int main(int argc, char* argv[]) {
 
         if (command == "lex") {
             std::string outputPath = getArg(argc, argv, "--output");
+            if (outputPath.empty()) outputPath = getArg(argc, argv, "--output-file");
             if (outputPath.empty()) {
                 printUsage();
                 return 1;
@@ -98,8 +123,8 @@ int main(int argc, char* argv[]) {
                 return 1;
             }
 
-            std::string format = getArg(argc, argv, "--ast-format", "text");
-            if (format == "") format = getArg(argc, argv, "--format", "text");
+            std::string format = getArg(argc, argv, "--ast-format", "");
+            if (format.empty()) format = getArg(argc, argv, "--format", "text");
             std::string outputPath = getArg(argc, argv, "--output-file");
             if (outputPath.empty()) outputPath = getArg(argc, argv, "--output");
 
@@ -119,6 +144,30 @@ int main(int argc, char* argv[]) {
                 std::cout << "Tokens: " << lexer.all_tokens().size() << "\n";
                 std::cout << "Declarations: " << program.declarations.size() << "\n";
             }
+            return 0;
+        }
+
+        if (command == "check" || command == "symbols") {
+            ProgramNode program;
+            if (!lexAndParse(source, program)) return 1;
+
+            semantic::SemanticAnalyzer analyzer;
+            analyzer.analyze(program);
+
+            std::string outputPath = getArg(argc, argv, "--output-file");
+            if (outputPath.empty()) outputPath = getArg(argc, argv, "--output");
+
+            std::ostringstream out;
+            if (command == "symbols") {
+                out << analyzer.get_symbol_table().dump();
+            } else {
+                bool showTypes = hasArg(argc, argv, "--show-types") || hasArg(argc, argv, "--verbose");
+                out << analyzer.report(inputPath, showTypes);
+            }
+
+            writeText(outputPath, out.str());
+            if (!outputPath.empty()) std::cout << "Semantic report written to " << outputPath << "\n";
+            if (analyzer.has_errors()) return 1;
             return 0;
         }
 

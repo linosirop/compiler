@@ -1,0 +1,16 @@
+struct Point { int x; int y; }
+
+fn add(int a, float b) -> float {
+    float c = a + b;
+    return c;
+}
+
+fn main() {
+    int x = 1;
+    float y = add(x, 2.5);
+    bool ok = y > 0.0;
+    if (ok) {
+        y = y + 1.0;
+    }
+    return;
+}
