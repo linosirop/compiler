@@ -1,208 +1,134 @@
 # MiniCompiler
 
-MiniCompiler is an educational compiler front-end for a simplified C-like language. The project currently implements two main stages:
+MiniCompiler is a C++17 educational compiler front-end for a simplified C-like language. The project currently includes three phases:
 
-1. **Lexical analysis**: converts source code into a stream of tokens with line and column information.
-2. **Syntax analysis**: parses the token stream with a recursive descent parser and builds an Abstract Syntax Tree (AST).
+1. lexical analysis;
+2. parsing and AST generation;
+3. semantic analysis with symbol tables, type checking, and validation reports.
 
-Author: Panin Ivan
-
-## Project Structure
+## Project structure
 
 ```text
-compiler-project/
+compiler/
 ├── CMakeLists.txt
 ├── README.md
 ├── docs/
-│   └── language_spec.md
+│   ├── language_spec.md
+│   └── semantic.md
 ├── examples/
 ├── src/
 │   ├── lexer/
-│   │   ├── lexer.cpp
-│   │   ├── lexer.h
-│   │   ├── token.cpp
-│   │   └── token.h
 │   ├── parser/
-│   │   ├── ast.cpp
-│   │   ├── ast.h
-│   │   ├── grammar.txt
-│   │   ├── parser.cpp
-│   │   └── parser.h
+│   ├── semantic/
 │   └── main.cpp
 ├── scripts/
 └── tests/
+    ├── core_tests.cpp
+    ├── core_tests_extended.cpp
+    ├── semantic_tests.cpp
+    └── semantic/
 ```
 
-## Requirements
+## Build with CMake
 
-- CMake 3.15 or newer
-- C++17 compiler
-- Windows: Visual Studio 2022 Developer Command Prompt is recommended
-- Linux/macOS: GCC or Clang
-
-## Build Instructions
-
-### Windows 11 with Visual Studio Developer Command Prompt
-
-Open **x64 Native Tools Command Prompt for VS 2022** or **Developer Command Prompt for VS 2022**, then run:
+From Developer Command Prompt for VS 2022 on Windows:
 
 ```cmd
 cd "C:\Users\User\Desktop\Учеба\compiler"
-cmake -S . -B build
+cmake -S . -B build -DBUILD_TESTS=ON
 cmake --build build --config Debug
 ```
 
-The executable will usually be placed in:
+Run tests:
+
+```cmd
+ctest --test-dir build -C Debug --output-on-failure
+```
+
+## Manual build of semantic tests on Windows
+
+```cmd
+cl /std:c++17 /EHsc /I src src\lexer\token.cpp src\lexer\lexer.cpp src\parser\ast.cpp src\parser\parser.cpp src\semantic\type_system.cpp src\semantic\symbol_table.cpp src\semantic\errors.cpp src\semantic\analyzer.cpp tests\semantic_tests.cpp /Fe:semantic_tests.exe
+semantic_tests.exe
+```
+
+Expected result:
 
 ```text
-build\Debug\compiler.exe
+Passed: 49
+Failed: 0
 ```
 
-### Linux/macOS or Windows with MinGW
-
-```bash
-cmake -S . -B build
-cmake --build build
-```
-
-## Command-Line Usage
-
-### Lexical analysis
+## Lexical analysis
 
 ```cmd
 build\Debug\compiler.exe lex --input examples\hello.src --output tokens.txt
 ```
 
-Expected token output format:
+## Parsing and AST output
 
-```text
-LINE:COLUMN TOKEN_TYPE "LEXEME" [LITERAL_VALUE]
-```
-
-Example:
-
-```text
-1:1 KW_FN "fn"
-1:4 IDENTIFIER "main"
-1:8 LPAREN "("
-1:9 RPAREN ")"
-1:11 LBRACE "{"
-```
-
-### Parser and AST text output
+Text AST:
 
 ```cmd
 build\Debug\compiler.exe parse --input examples\hello.src --ast-format text --output-file ast.txt
 ```
 
-### Parser and Graphviz DOT output
+DOT AST:
 
 ```cmd
 build\Debug\compiler.exe parse --input examples\hello.src --ast-format dot --output-file ast.dot
 ```
 
-To convert DOT into an image, install Graphviz and run:
+## Semantic analysis
+
+Semantic analysis validates declarations, scopes, types, function calls, return statements, and conditions.
 
 ```cmd
-dot -Tpng ast.dot -o ast.png
+build\Debug\compiler.exe check --input examples\hello.src --show-types
 ```
 
-### Verbose mode
+Write semantic report:
 
 ```cmd
-build\Debug\compiler.exe parse --input examples\hello.src --ast-format text --verbose
+build\Debug\compiler.exe check --input examples\hello.src --output-file semantic_report.txt --show-types
 ```
 
-## Example Source Program
-
-```c
-fn main() -> void {
-    int counter = 42;
-    bool ok = counter > 0 && counter < 100;
-    return;
-}
-```
-
-## Language Overview
-
-The language supports:
-
-- functions declared with `fn`;
-- optional return type syntax: `fn name(...) -> type`;
-- primitive types: `int`, `float`, `bool`, `void`;
-- user-defined type names through identifiers;
-- structures declared with `struct`;
-- variable declarations;
-- assignments and compound assignments;
-- `if` / `else`;
-- `while` and `for` loops;
-- `return` statements;
-- function calls;
-- integer, floating-point, string, and boolean literals.
-
-The lexical grammar is documented in `docs/language_spec.md`.
-The parser grammar is documented in `src/parser/grammar.txt`.
-
-## Testing
-
-The project includes standalone C++ tests that do not require GoogleTest.
-
-### Extended tests on Windows 11 with Visual Studio compiler
-
-From the project root:
+Dump symbol table only:
 
 ```cmd
-cl /std:c++17 /EHsc /I src src\lexer\token.cpp src\lexer\lexer.cpp src\parser\ast.cpp src\parser\parser.cpp tests\core_tests_extended.cpp /Fe:core_tests_extended.exe
-core_tests_extended.exe
+build\Debug\compiler.exe symbols --input examples\hello.src --output-file symbols.txt
 ```
 
-Expected result after the current fixes:
+## Example semantic errors
 
 ```text
-Passed: 83
-Failed: 0
+semantic error: type mismatch: cannot initialize 'x' of type int with bool
+  --> program.src:1:21
+  = context: in function 'main'
+
+semantic error: undeclared identifier: identifier 'y' is not declared
+  --> program.src:1:27
+  = context: in function 'main'
+
+semantic error: invalid condition type: if condition must be bool, found int
+  --> program.src:1:38
+  = context: in function 'main'
 ```
 
-### Extended tests through CMake
+## Semantic rules
 
-If `tests/core_tests_extended.cpp` exists, CMake creates an additional test executable automatically:
+- Duplicate declarations in the same scope are rejected.
+- Function declarations support forward references.
+- Variables are visible only in their declaring scope and nested scopes.
+- `int` can be assigned to `float`, but `float` cannot be assigned to `int`.
+- Conditions in `if`, `while`, and `for` must be `bool`.
+- Function calls must match parameter count and parameter types.
+- Return statements must match the declared function return type.
+- Variables declared without initializers are considered uninitialized until assignment.
 
-```cmd
-cmake -S . -B build -DBUILD_TESTS=ON
-cmake --build build --config Debug
-ctest --test-dir build -C Debug --output-on-failure
-```
+## Before submission
 
-## Important Syntax Rules
-
-Comparison and equality operators are **non-associative**. This means the following expression is invalid:
-
-```c
-bool x = 1 < 2 < 3;
-```
-
-Use explicit logical conjunction instead:
-
-```c
-bool x = (1 < 2) && (2 < 3);
-```
-
-Assignment targets must be identifiers. These are invalid:
-
-```c
-1 = x;
-foo() = 2;
-```
-
-This is valid:
-
-```c
-x = 2;
-```
-
-## Repository Hygiene
-
-Before submitting the project, remove generated files and build artifacts:
+Do not commit generated or local build files:
 
 ```text
 .vs/
@@ -213,10 +139,9 @@ out/
 *.pdb
 *.ilk
 *.ipch
-tokens.txt
+semantic_report.txt
+symbols.txt
 ast.txt
 ast.dot
-ast.png
+tokens.txt
 ```
-
-Only source code, tests, documentation, examples, scripts, and build configuration should remain in the final archive.

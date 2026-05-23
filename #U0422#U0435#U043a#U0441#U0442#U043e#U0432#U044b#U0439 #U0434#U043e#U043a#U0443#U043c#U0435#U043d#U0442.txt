@@ -1,0 +1,42 @@
+powershell -ExecutionPolicy Bypass -File .\scripts\run_parser_tests.ps1
+
+cmake --build out\build\x64-Debug
+
+лексер
+
+.\out\build\x64-Debug\compiler.exe lex --input examples\hello.src --output tokens.txt
+
+notepad tokens.txt
+
+Показать parser / AST text
+
+.\out\build\x64-Debug\compiler.exe parse --input examples\hello.src --ast-format text
+
+Записать AST в файл
+
+
+.\out\build\x64-Debug\compiler.exe parse --input examples\hello.src --ast-format text --output-file ast.txt
+
+notepad ast.txt
+
+
+
+
+.\out\build\x64-Debug\compiler.exe parse --input examples\hello.src --ast-format dot --output-file ast.dot
+x
+dot -Tpng ast.dot -o ast.png
+start ast.png
+
+
+парсер
+
+.\out\build\x64-Debug\compiler.exe parse --input tests\parser\valid\test_if.src --ast-format text
+
+C:\Users\User\Desktop\Учеба\compiler>.\out\build\x64-Debug\compiler.exe parse --input tests\parser\invalid\chained_relational.src --ast-format text
+
+
+
+
+DOT: .\out\build\x64-Debug\compiler.exe parse --input examples\hello.src --ast-format dot --output-file ast.dot
+dot -Tpng ast.dot -o ast.png
+start ast.png

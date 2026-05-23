@@ -40,3 +40,19 @@ C:\Users\User\Desktop\Учеба\compiler>.\out\build\x64-Debug\compiler.exe par
 DOT: .\out\build\x64-Debug\compiler.exe parse --input examples\hello.src --ast-format dot --output-file ast.dot
 dot -Tpng ast.dot -o ast.png
 start ast.png
+
+
+cd ~/projects/compiler
+
+cmake -S . -B build -DBUILD_TESTS=ON -G "Unix Makefiles"
+cmake --build build
+ctest --test-dir build --output-on-failure
+
+./build/compiler compile --input tests/codegen/valid/function_calls/add_call.src --output add.asm --target x86_64 --emit-stack-map
+
+nasm -f elf64 -o add.o add.asm
+nasm -f elf64 -o runtime.o src/runtime/runtime.asm
+ld -o add_program runtime.o add.o
+
+./add_program
+echo $?

@@ -8,6 +8,9 @@
 #include "parser/parser.h"
 #include "parser/ast.h"
 #include "semantic/analyzer.h"
+#include "ir/ir_generator.h"
+#include "ir/control_flow.h"
+#include "codegen/x86_generator.h"
 
 namespace {
 std::string readFile(const std::string& path) {
@@ -35,7 +38,9 @@ void printUsage() {
               << "  compiler lex --input <file.src> --output <tokens.txt>\n"
               << "  compiler parse --input <file.src> [--ast-format text|dot] [--output-file <file>] [--verbose]\n"
               << "  compiler check --input <file.src> [--output-file <file>] [--show-types] [--verbose]\n"
-              << "  compiler symbols --input <file.src> [--output-file <file>]\n";
+              << "  compiler symbols --input <file.src> [--output-file <file>]\n"
+              << "  compiler ir --input <file.src> [--format text|dot] [--output-file <file>] [--stats] [--validate]\n"
+              << "  compiler compile --input <file.src> --output <file.asm> [--target x86_64] [--emit-stack-map]\n";
 }
 
 std::string getArg(int argc, char* argv[], const std::string& name, const std::string& defaultValue = "") {
@@ -147,27 +152,80 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
-        if (command == "check" || command == "symbols") {
+        if (command == "check" || command == "symbols" || command == "ir" || command == "compile") {
             ProgramNode program;
             if (!lexAndParse(source, program)) return 1;
 
             semantic::SemanticAnalyzer analyzer;
             analyzer.analyze(program);
 
+            if (command == "check" || command == "symbols") {
+                std::string outputPath = getArg(argc, argv, "--output-file");
+                if (outputPath.empty()) outputPath = getArg(argc, argv, "--output");
+
+                std::ostringstream out;
+                if (command == "symbols") {
+                    out << analyzer.get_symbol_table().dump();
+                } else {
+                    bool showTypes = hasArg(argc, argv, "--show-types") || hasArg(argc, argv, "--verbose");
+                    out << analyzer.report(inputPath, showTypes);
+                }
+
+                writeText(outputPath, out.str());
+                if (!outputPath.empty()) std::cout << "Semantic report written to " << outputPath << "\n";
+                if (analyzer.has_errors()) return 1;
+                return 0;
+            }
+
+            if (analyzer.has_errors()) {
+                std::cerr << analyzer.report(inputPath, true);
+                return 1;
+            }
+
+            ir::IRGenerator generator(&analyzer.get_symbol_table());
+            ir::IRProgram irProgram = generator.generate(program);
+
+            if (command == "compile") {
+                std::string target = getArg(argc, argv, "--target", "x86_64");
+                if (target != "x86_64") {
+                    std::cerr << "Unsupported target: " << target << "\n";
+                    return 1;
+                }
+
+                std::string outputPath = getArg(argc, argv, "--output-file");
+                if (outputPath.empty()) outputPath = getArg(argc, argv, "--output");
+                if (outputPath.empty()) {
+                    printUsage();
+                    return 1;
+                }
+
+                codegen::X86GeneratorOptions options;
+                options.emitStackMap = hasArg(argc, argv, "--emit-stack-map") || hasArg(argc, argv, "--verbose");
+                codegen::X86Generator x86(options);
+                writeText(outputPath, x86.generate(irProgram));
+                std::cout << "Assembly written to " << outputPath << "\n";
+                return 0;
+            }
+
+            std::string format = getArg(argc, argv, "--format", "text");
             std::string outputPath = getArg(argc, argv, "--output-file");
             if (outputPath.empty()) outputPath = getArg(argc, argv, "--output");
 
             std::ostringstream out;
-            if (command == "symbols") {
-                out << analyzer.get_symbol_table().dump();
+            if (format == "text") {
+                out << irProgram.toText();
+            } else if (format == "dot") {
+                out << irProgram.toDot();
             } else {
-                bool showTypes = hasArg(argc, argv, "--show-types") || hasArg(argc, argv, "--verbose");
-                out << analyzer.report(inputPath, showTypes);
+                std::cerr << "Unsupported IR format: " << format << "\n";
+                return 1;
             }
 
+            if (hasArg(argc, argv, "--stats")) out << "\n" << irProgram.statistics();
+            if (hasArg(argc, argv, "--validate")) out << "\n" << ir::validateControlFlow(irProgram);
+
             writeText(outputPath, out.str());
-            if (!outputPath.empty()) std::cout << "Semantic report written to " << outputPath << "\n";
-            if (analyzer.has_errors()) return 1;
+            if (!outputPath.empty()) std::cout << "IR written to " << outputPath << "\n";
             return 0;
         }
 
