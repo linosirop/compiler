@@ -1,147 +1,630 @@
-# MiniCompiler
+\# MiniCompiler
 
-MiniCompiler is a C++17 educational compiler front-end for a simplified C-like language. The project currently includes three phases:
 
-1. lexical analysis;
-2. parsing and AST generation;
-3. semantic analysis with symbol tables, type checking, and validation reports.
 
-## Project structure
+MiniCompiler — это учебный компилятор на C++17 для упрощённого C-like языка.
 
-```text
-compiler/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── language_spec.md
-│   └── semantic.md
-├── examples/
-├── src/
-│   ├── lexer/
-│   ├── parser/
-│   ├── semantic/
-│   └── main.cpp
-├── scripts/
-└── tests/
-    ├── core_tests.cpp
-    ├── core_tests_extended.cpp
-    ├── semantic_tests.cpp
-    └── semantic/
-```
 
-## Build with CMake
 
-From Developer Command Prompt for VS 2022 on Windows:
+Проект реализует основные этапы компиляции:
 
-```cmd
-cd "C:\Users\User\Desktop\Учеба\compiler"
-cmake -S . -B build -DBUILD_TESTS=ON
-cmake --build build --config Debug
-```
 
-Run tests:
 
-```cmd
-ctest --test-dir build -C Debug --output-on-failure
-```
+1\. \*\*Sprint 1\*\* — лексический анализатор, Lexer
 
-## Manual build of semantic tests on Windows
+2\. \*\*Sprint 2\*\* — парсер и AST
 
-```cmd
-cl /std:c++17 /EHsc /I src src\lexer\token.cpp src\lexer\lexer.cpp src\parser\ast.cpp src\parser\parser.cpp src\semantic\type_system.cpp src\semantic\symbol_table.cpp src\semantic\errors.cpp src\semantic\analyzer.cpp tests\semantic_tests.cpp /Fe:semantic_tests.exe
-semantic_tests.exe
-```
+3\. \*\*Sprint 3\*\* — семантический анализ
 
-Expected result:
+4\. \*\*Sprint 4\*\* — промежуточное представление, IR
 
-```text
-Passed: 49
-Failed: 0
-```
+5\. \*\*Sprint 5\*\* — генерация x86-64 assembly
 
-## Lexical analysis
 
-```cmd
-build\Debug\compiler.exe lex --input examples\hello.src --output tokens.txt
-```
 
-## Parsing and AST output
+\---
 
-Text AST:
 
-```cmd
-build\Debug\compiler.exe parse --input examples\hello.src --ast-format text --output-file ast.txt
-```
 
-DOT AST:
+\## 1. Что нужно установить
 
-```cmd
-build\Debug\compiler.exe parse --input examples\hello.src --ast-format dot --output-file ast.dot
-```
 
-## Semantic analysis
 
-Semantic analysis validates declarations, scopes, types, function calls, return statements, and conditions.
+Проект можно писать на Windows 11, но \*\*Sprint 5 проверяется через WSL Ubuntu\*\*, потому что генерация assembly сделана под:
 
-```cmd
-build\Debug\compiler.exe check --input examples\hello.src --show-types
-```
 
-Write semantic report:
 
-```cmd
-build\Debug\compiler.exe check --input examples\hello.src --output-file semantic_report.txt --show-types
-```
+\- Linux
 
-Dump symbol table only:
+\- NASM
 
-```cmd
-build\Debug\compiler.exe symbols --input examples\hello.src --output-file symbols.txt
-```
+\- ELF64
 
-## Example semantic errors
+\- System V AMD64 ABI
 
-```text
-semantic error: type mismatch: cannot initialize 'x' of type int with bool
-  --> program.src:1:21
-  = context: in function 'main'
+\- `ld`
 
-semantic error: undeclared identifier: identifier 'y' is not declared
-  --> program.src:1:27
-  = context: in function 'main'
+\- Linux syscalls
 
-semantic error: invalid condition type: if condition must be bool, found int
-  --> program.src:1:38
-  = context: in function 'main'
-```
 
-## Semantic rules
 
-- Duplicate declarations in the same scope are rejected.
-- Function declarations support forward references.
-- Variables are visible only in their declaring scope and nested scopes.
-- `int` can be assigned to `float`, but `float` cannot be assigned to `int`.
-- Conditions in `if`, `while`, and `for` must be `bool`.
-- Function calls must match parameter count and parameter types.
-- Return statements must match the declared function return type.
-- Variables declared without initializers are considered uninitialized until assignment.
+То есть на Windows проект редактируем, а компиляцию и запуск backend-а делаем через WSL.
 
-## Before submission
 
-Do not commit generated or local build files:
 
-```text
-.vs/
-build/
-out/
-*.exe
-*.obj
-*.pdb
-*.ilk
-*.ipch
-semantic_report.txt
-symbols.txt
-ast.txt
-ast.dot
-tokens.txt
-```
+\### Установка инструментов в WSL Ubuntu
+
+
+
+```bash
+
+sudo apt update
+
+sudo apt install -y build-essential cmake nasm git
+
+
+
+Проверка:
+
+
+
+g++ --version
+
+cmake --version
+
+nasm -v
+
+ld --version
+
+
+
+3\. Сборка проекта
+
+
+
+Из корня проекта:
+
+
+
+cmake -S . -B build -DBUILD\_TESTS=ON -G "Unix Makefiles"
+
+cmake --build build
+
+
+
+Запуск всех тестов:
+
+
+
+ctest --test-dir build --output-on-failure
+
+
+
+Ожидаемый результат:
+
+
+
+100% tests passed
+
+
+
+Sprint 1 — Lexer / Лексический анализатор
+
+
+
+На этом этапе исходный код разбивается на токены.
+
+
+
+Пример:
+
+
+
+fn main() {
+
+&#x20;   int x = 42;
+
+}
+
+
+
+Lexer превращает это в набор токенов:
+
+
+
+KW\_FN
+
+IDENTIFIER
+
+LPAREN
+
+RPAREN
+
+LBRACE
+
+KW\_INT
+
+IDENTIFIER
+
+ASSIGN
+
+INT\_LITERAL
+
+SEMICOLON
+
+RBRACE
+
+Запустить lexer
+
+./build/compiler lex --input examples/hello.src
+
+Сохранить токены в файл
+
+./build/compiler lex --input examples/hello.src --output tokens.txt
+
+Посмотреть результат
+
+cat tokens.txt
+
+Что демонстрирует Sprint 1
+
+распознавание ключевых слов;
+
+распознавание идентификаторов;
+
+распознавание чисел, строк, boolean-значений;
+
+распознавание операторов;
+
+отслеживание line/column;
+
+обработку ошибок lexer-а.
+
+Sprint 2 — Parser / AST
+
+
+
+На этом этапе токены превращаются в синтаксическое дерево — AST.
+
+
+
+AST показывает структуру программы: функции, блоки, переменные, выражения, return и т.д.
+
+
+
+Распарсить файл и вывести AST в консоль
+
+./build/compiler parse --input examples/hello.src --ast-format text
+
+Сохранить AST в файл
+
+./build/compiler parse --input examples/hello.src --ast-format text --output ast.txt
+
+
+
+Посмотреть:
+
+
+
+cat ast.txt
+
+Сгенерировать AST в формате Graphviz DOT
+
+./build/compiler parse --input examples/hello.src --ast-format dot --output ast.dot
+
+Превратить DOT в PNG
+
+
+
+Для этого нужен Graphviz:
+
+
+
+sudo apt install -y graphviz
+
+
+
+Команда:
+
+
+
+dot -Tpng ast.dot -o ast.png
+
+
+
+После этого появится картинка:
+
+
+
+ast.png
+
+Что демонстрирует Sprint 2
+
+recursive descent parser;
+
+построение AST;
+
+обработку функций;
+
+обработку блоков;
+
+обработку if/else, while, for;
+
+обработку выражений с приоритетами операторов;
+
+вывод AST в text и DOT.
+
+Sprint 3 — Semantic Analysis / Семантический анализ
+
+
+
+На этом этапе компилятор проверяет смысл программы.
+
+
+
+Например:
+
+
+
+объявлена ли переменная;
+
+нет ли повторного объявления;
+
+совпадают ли типы;
+
+правильно ли вызываются функции;
+
+правильный ли тип возвращает return;
+
+boolean ли условие в if / while.
+
+Запустить semantic check
+
+./build/compiler check --input examples/hello.src
+
+Запустить semantic check с выводом типов
+
+./build/compiler check --input examples/hello.src --show-types
+
+Вывести symbol table
+
+./build/compiler symbols --input examples/hello.src
+
+Сохранить symbol table в файл
+
+./build/compiler symbols --input examples/hello.src --output symbols.txt
+
+
+
+Посмотреть:
+
+
+
+cat symbols.txt
+
+Что демонстрирует Sprint 3
+
+symbol table;
+
+области видимости;
+
+проверку типов;
+
+проверку функций;
+
+semantic errors;
+
+decorated/type-annotated AST.
+
+Sprint 4 — IR / Intermediate Representation
+
+
+
+На этом этапе программа переводится в промежуточное представление — IR.
+
+
+
+IR — это форма между AST и assembly.
+
+Она удобна для оптимизаций и дальнейшей генерации машинного кода.
+
+
+
+Пример IR-операций:
+
+
+
+ADD
+
+SUB
+
+MUL
+
+DIV
+
+CMP\_GT
+
+JUMP
+
+JUMP\_IF
+
+CALL
+
+RETURN
+
+Сгенерировать IR
+
+./build/compiler ir --input examples/factorial.src
+
+Сохранить IR в файл
+
+./build/compiler ir --input examples/factorial.src --output factorial.ir
+
+
+
+Посмотреть:
+
+
+
+cat factorial.ir
+
+Сгенерировать IR со статистикой
+
+./build/compiler ir --input examples/factorial.src --stats
+
+Сгенерировать IR и проверить control flow
+
+./build/compiler ir --input examples/factorial.src --validate
+
+Полная команда для IR
+
+./build/compiler ir --input examples/factorial.src --stats --validate
+
+Сгенерировать CFG в DOT
+
+./build/compiler ir --input examples/factorial.src --format dot --output cfg.dot
+
+Превратить CFG в PNG
+
+dot -Tpng cfg.dot -o cfg.png
+
+Что демонстрирует Sprint 4
+
+генерацию IR;
+
+basic blocks;
+
+control flow graph;
+
+временные переменные t1, t2, t3;
+
+инструкции ADD, SUB, MUL, CALL, RETURN;
+
+проверку корректности переходов.
+
+Sprint 5 — x86-64 Code Generation / Генерация Assembly
+
+
+
+На этом этапе IR переводится в x86-64 assembly.
+
+
+
+Backend генерирует:
+
+
+
+NASM syntax;
+
+ELF64 object files;
+
+System V AMD64 ABI;
+
+stack frame;
+
+function prologue/epilogue;
+
+вызовы функций;
+
+return values.
+
+Сгенерировать assembly
+
+./build/compiler compile --input tests/codegen/valid/function\_calls/add\_call.src --output add.asm --target x86\_64
+
+Сгенерировать assembly с картой stack frame
+
+./build/compiler compile --input tests/codegen/valid/function\_calls/add\_call.src --output add.asm --target x86\_64 --emit-stack-map
+
+Посмотреть assembly
+
+cat add.asm
+
+Собрать generated assembly в object file
+
+nasm -f elf64 -o add.o add.asm
+
+Собрать runtime library
+
+nasm -f elf64 -o runtime.o src/runtime/runtime.asm
+
+Слинковать executable
+
+ld -o add\_program runtime.o add.o
+
+Запустить программу
+
+./add\_program
+
+echo $?
+
+
+
+Для файла:
+
+
+
+tests/codegen/valid/function\_calls/add\_call.src
+
+
+
+ожидаемый результат:
+
+
+
+5
+
+
+
+Это значит, что программа реально выполнилась и вернула результат:
+
+
+
+2 + 3 = 5
+
+Полная демонстрация Sprint 5
+
+
+
+Эти команды можно использовать при защите/проверке:
+
+
+
+cd \~/projects/compiler
+
+
+
+cmake -S . -B build -DBUILD\_TESTS=ON -G "Unix Makefiles"
+
+cmake --build build
+
+ctest --test-dir build --output-on-failure
+
+
+
+./build/compiler compile --input tests/codegen/valid/function\_calls/add\_call.src --output add.asm --target x86\_64 --emit-stack-map
+
+
+
+nasm -f elf64 -o add.o add.asm
+
+nasm -f elf64 -o runtime.o src/runtime/runtime.asm
+
+ld -o add\_program runtime.o add.o
+
+
+
+./add\_program
+
+echo $?
+
+
+
+Ожидаемый вывод:
+
+
+
+5
+
+Запуск всех тестов
+
+
+
+Все тесты проекта:
+
+
+
+ctest --test-dir build --output-on-failure
+
+
+
+Ожидаемо:
+
+
+
+100% tests passed
+
+
+
+В проекте есть тесты для:
+
+
+
+lexer;
+
+parser;
+
+semantic analysis;
+
+IR;
+
+codegen.
+
+Полезные быстрые команды
+
+Lexer
+
+./build/compiler lex --input examples/hello.src
+
+Parser
+
+./build/compiler parse --input examples/hello.src --ast-format text
+
+Semantic
+
+./build/compiler check --input examples/hello.src --show-types
+
+IR
+
+./build/compiler ir --input examples/factorial.src --stats --validate
+
+Codegen
+
+./build/compiler compile --input tests/codegen/valid/function\_calls/add\_call.src --output add.asm --target x86\_64 --emit-stack-map
+
+Runtime library
+
+
+
+Для Sprint 5 нужен файл:
+
+
+
+src/runtime/runtime.asm
+
+
+
+Он содержит минимальную runtime library:
+
+
+
+\_start;
+
+exit;
+
+print\_int;
+
+print\_string;
+
+read\_int.
+
+
+
+Если в .gitignore есть правило:
+
+
+
+\*.asm
+
+
+
+то файл runtime может не добавиться автоматически.
+
+
+
+Добавлять его надо так:
+
+
+
+git add -f src/runtime/runtime.asm
+

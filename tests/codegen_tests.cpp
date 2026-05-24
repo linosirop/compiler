@@ -105,9 +105,47 @@ int main() {
         bool ok = compileToAssembly(source, assembly, errors);
         check(ok, "codegen: control flow source compiles", errors);
         check(contains(assembly, "cmp rax, r10"), "codegen: emits cmp", assembly);
-        check(contains(assembly, "setl al"), "codegen: maps CMP_LT to setl", assembly);
-        check(contains(assembly, "jne .main_L_then"), "codegen: maps JUMP_IF to jne", assembly);
+        check(contains(assembly, "jl .main_L_then"), "codegen: maps CMP_LT branch to jl", assembly);
+        check(contains(assembly, "direct conditional jump"), "codegen: optimizes comparison followed by branch", assembly);
         check(contains(assembly, "jmp .main_L_else") || contains(assembly, "jmp .main_L_endif"), "codegen: emits unconditional jumps", assembly);
+    }
+
+    {
+        std::string source =
+            "fn main() -> int {\n"
+            "    int a = 0;\n"
+            "    int b = 10;\n"
+            "    if (a != 0 && b / a > 2) { return 99; }\n"
+            "    return 5;\n"
+            "}\n";
+        std::string assembly;
+        std::string errors;
+        bool ok = compileToAssembly(source, assembly, errors);
+        check(ok, "codegen: short-circuit AND source compiles", errors);
+        check(contains(assembly, "L_and_rhs") && contains(assembly, "L_logic_false"), "codegen: emits short-circuit AND labels", assembly);
+        check(contains(assembly, "je .main_L_logic_false") || contains(assembly, "jge .main_L_logic_false") || contains(assembly, "jne .main_L_logic_true"),
+              "codegen: emits direct conditional jumps for logical control flow", assembly);
+    }
+
+    {
+        std::string source =
+            "fn main() -> int {\n"
+            "    int i = 0;\n"
+            "    int sum = 0;\n"
+            "    while (i < 4) {\n"
+            "        sum = sum + i;\n"
+            "        i = i + 1;\n"
+            "    }\n"
+            "    return sum;\n"
+            "}\n";
+        std::string assembly;
+        std::string errors;
+        bool ok = compileToAssembly(source, assembly, errors);
+        check(ok, "codegen: while loop source compiles", errors);
+        check(contains(assembly, ".main_L_while_header"), "codegen: emits while header label", assembly);
+        check(contains(assembly, ".main_L_while_end"), "codegen: emits while exit label", assembly);
+        check(contains(assembly, "jl .main_L_while_body") || contains(assembly, "jne .main_L_while_body"),
+              "codegen: emits conditional loop branch", assembly);
     }
 
     std::cout << "\nPassed: " << passed << "\n";

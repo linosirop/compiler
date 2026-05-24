@@ -184,9 +184,9 @@ int main() {
             "    bool ok = !(true && false) || true;\n"
             "}\n";
         std::string text = irText(source);
-        check(contains(text, "AND true, false"), "ir: logical AND is emitted", text);
+        check(contains(text, "short-circuit &&"), "ir: logical AND uses short-circuit branches", text);
         check(contains(text, "NOT"), "ir: logical NOT is emitted", text);
-        check(contains(text, "OR"), "ir: logical OR is emitted", text);
+        check(contains(text, "short-circuit ||"), "ir: logical OR uses short-circuit branches", text);
     }
 
     {

@@ -48,8 +48,13 @@ void X86Generator::generateFunction(const ir::IRFunction& function) {
         if (block.label != "entry") {
             out_ << labelFor(block.label) << ":\n";
         }
-        for (const auto& instruction : block.instructions) {
-            emitInstruction(instruction);
+        for (size_t i = 0; i < block.instructions.size(); ++i) {
+            if (i + 1 < block.instructions.size() &&
+                tryEmitDirectConditionalJump(block.instructions[i], block.instructions[i + 1])) {
+                ++i;
+                continue;
+            }
+            emitInstruction(block.instructions[i]);
         }
     }
 
@@ -218,6 +223,55 @@ void X86Generator::emitComparison(const ir::IRInstruction& instruction, const st
     out_ << "    set" << conditionCode << " al\n";
     out_ << "    movzx rax, al\n";
     storeOperand(instruction.dest, "rax");
+}
+
+bool X86Generator::tryEmitDirectConditionalJump(const ir::IRInstruction& comparison, const ir::IRInstruction& branch) {
+    using ir::Opcode;
+    if (!isComparisonOpcode(comparison.opcode) || comparison.dest.empty()) return false;
+    if (branch.opcode != Opcode::JUMP_IF && branch.opcode != Opcode::JUMP_IF_NOT) return false;
+    if (branch.operands.size() < 2 || branch.operands.at(0) != comparison.dest) return false;
+
+    if (options_.emitComments) {
+        if (!comparison.comment.empty()) out_ << "    ; " << comparison.comment << "\n";
+        out_ << "    ; direct conditional jump for comparison result\n";
+    }
+
+    loadOperand(comparison.operands.at(0), "rax");
+    loadOperand(comparison.operands.at(1), "r10");
+    out_ << "    cmp rax, r10\n";
+    std::string jumpCode = jumpCodeForComparison(comparison.opcode);
+    if (branch.opcode == Opcode::JUMP_IF_NOT) jumpCode = invertJumpCode(jumpCode);
+    out_ << "    j" << jumpCode << " " << labelFor(branch.operands.at(1)) << "\n";
+    return true;
+}
+
+bool X86Generator::isComparisonOpcode(ir::Opcode opcode) {
+    using ir::Opcode;
+    return opcode == Opcode::CMP_EQ || opcode == Opcode::CMP_NE || opcode == Opcode::CMP_LT ||
+           opcode == Opcode::CMP_LE || opcode == Opcode::CMP_GT || opcode == Opcode::CMP_GE;
+}
+
+std::string X86Generator::jumpCodeForComparison(ir::Opcode opcode) {
+    using ir::Opcode;
+    switch (opcode) {
+    case Opcode::CMP_EQ: return "e";
+    case Opcode::CMP_NE: return "ne";
+    case Opcode::CMP_LT: return "l";
+    case Opcode::CMP_LE: return "le";
+    case Opcode::CMP_GT: return "g";
+    case Opcode::CMP_GE: return "ge";
+    default: return "ne";
+    }
+}
+
+std::string X86Generator::invertJumpCode(const std::string& jumpCode) {
+    if (jumpCode == "e") return "ne";
+    if (jumpCode == "ne") return "e";
+    if (jumpCode == "l") return "ge";
+    if (jumpCode == "le") return "g";
+    if (jumpCode == "g") return "le";
+    if (jumpCode == "ge") return "l";
+    return "e";
 }
 
 void X86Generator::emitCall(const ir::IRInstruction& instruction) {

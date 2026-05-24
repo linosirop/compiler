@@ -1,0 +1,11 @@
+fn main() -> int {
+    int a = 2;
+    int b = 3;
+    int c = 4;
+    int d = 5;
+    int result = (a + b) * (c + d) - 40;
+    if (result == 5) {
+        return result;
+    }
+    return 1;
+}

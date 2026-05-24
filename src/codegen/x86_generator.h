@@ -25,12 +25,16 @@ public:
 private:
     void generateFunction(const ir::IRFunction& function);
     void emitInstruction(const ir::IRInstruction& instruction);
+    bool tryEmitDirectConditionalJump(const ir::IRInstruction& comparison, const ir::IRInstruction& branch);
     void emitPrologue(const ir::IRFunction& function);
     void emitEpilogue();
 
     void emitBinary(const ir::IRInstruction& instruction, const std::string& mnemonic);
     void emitDivision(const ir::IRInstruction& instruction, bool remainder);
     void emitComparison(const ir::IRInstruction& instruction, const std::string& conditionCode);
+    static bool isComparisonOpcode(ir::Opcode opcode);
+    static std::string jumpCodeForComparison(ir::Opcode opcode);
+    static std::string invertJumpCode(const std::string& jumpCode);
     void emitCall(const ir::IRInstruction& instruction);
 
     void loadOperand(const std::string& operand, const std::string& reg);

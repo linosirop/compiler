@@ -39,6 +39,7 @@ private:
     std::string generateLiteral(const LiteralExprNode& node);
     std::string generateIdentifier(const IdentifierExprNode& node);
     std::string generateBinary(const BinaryExprNode& node);
+    std::string generateShortCircuitLogical(const BinaryExprNode& node);
     std::string generateUnary(const UnaryExprNode& node);
     std::string generateAssignment(const AssignmentExprNode& node);
     std::string generateCall(const CallExprNode& node);

@@ -1,0 +1,11 @@
+fn main() -> int {
+    int x = 3;
+    if (x > 0) {
+        if (x < 5) {
+            return 7;
+        }
+        return 8;
+    } else {
+        return 9;
+    }
+}

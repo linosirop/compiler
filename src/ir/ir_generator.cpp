@@ -220,11 +220,58 @@ Opcode IRGenerator::opcodeForBinary(const std::string& op) const {
 }
 
 std::string IRGenerator::generateBinary(const BinaryExprNode& node) {
+    if (node.op == "&&" || node.op == "||") {
+        return generateShortCircuitLogical(node);
+    }
+
     std::string left = generateExpression(node.left);
     std::string right = generateExpression(node.right);
     std::string temp = currentFunction_->newTemp();
     emit(opcodeForBinary(node.op), temp, {left, right}, left + " " + node.op + " " + right);
     return temp;
+}
+
+std::string IRGenerator::generateShortCircuitLogical(const BinaryExprNode& node) {
+    const bool isAnd = node.op == "&&";
+    const std::string result = currentFunction_->newTemp();
+    const std::string rightLabel = currentFunction_->newLabel(isAnd ? "L_and_rhs" : "L_or_rhs");
+    const std::string trueLabel = currentFunction_->newLabel("L_logic_true");
+    const std::string falseLabel = currentFunction_->newLabel("L_logic_false");
+    const std::string endLabel = currentFunction_->newLabel("L_logic_end");
+
+    std::string left = generateExpression(node.left);
+    if (isAnd) {
+        emit(Opcode::JUMP_IF_NOT, "", {left, falseLabel}, "short-circuit &&: left operand is false");
+        currentFunction_->currentBlock().addSuccessor(falseLabel);
+        emitJump(rightLabel);
+
+        currentFunction_->createBlock(rightLabel);
+        std::string right = generateExpression(node.right);
+        emit(Opcode::JUMP_IF, "", {right, trueLabel}, "&& right operand is true");
+        currentFunction_->currentBlock().addSuccessor(trueLabel);
+        emitJump(falseLabel);
+    } else {
+        emit(Opcode::JUMP_IF, "", {left, trueLabel}, "short-circuit ||: left operand is true");
+        currentFunction_->currentBlock().addSuccessor(trueLabel);
+        emitJump(rightLabel);
+
+        currentFunction_->createBlock(rightLabel);
+        std::string right = generateExpression(node.right);
+        emit(Opcode::JUMP_IF, "", {right, trueLabel}, "|| right operand is true");
+        currentFunction_->currentBlock().addSuccessor(trueLabel);
+        emitJump(falseLabel);
+    }
+
+    currentFunction_->createBlock(trueLabel);
+    emit(Opcode::MOVE, result, {"true"}, node.op + " result = true");
+    emitJump(endLabel);
+
+    currentFunction_->createBlock(falseLabel);
+    emit(Opcode::MOVE, result, {"false"}, node.op + " result = false");
+    emitJump(endLabel);
+
+    currentFunction_->createBlock(endLabel);
+    return result;
 }
 
 std::string IRGenerator::generateUnary(const UnaryExprNode& node) {

@@ -31,6 +31,9 @@ add_library(compiler_core STATIC
     src/codegen/abi.cpp
     src/codegen/stack_frame.cpp
     src/codegen/register_allocator.cpp
+    src/codegen/label_manager.cpp
+    src/codegen/control_flow_generator.cpp
+    src/codegen/expression_generator.cpp
     src/codegen/x86_generator.cpp
 )
 
