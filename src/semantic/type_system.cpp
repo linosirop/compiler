@@ -16,6 +16,7 @@ Type::Type(TypeKind kind) : kind(kind) {
     case TypeKind::Error: name = "<error>"; break;
     case TypeKind::Struct: name = "<struct>"; break;
     case TypeKind::Function: name = "<function>"; break;
+    case TypeKind::Array: name = "<array>"; break;
     }
 }
 
@@ -37,12 +38,26 @@ Type Type::functionType(std::vector<Type> params, Type ret) {
     return type;
 }
 
+Type Type::arrayType(Type element, std::vector<int> dims) {
+    Type type(TypeKind::Array);
+    type.elementType = std::make_shared<Type>(std::move(element));
+    type.dimensions = std::move(dims);
+    type.name = type.elementType ? type.elementType->toString() : "unknown";
+    for (int dim : type.dimensions) {
+        type.name += "[";
+        if (dim > 0) type.name += std::to_string(dim);
+        type.name += "]";
+    }
+    return type;
+}
+
 bool Type::isNumeric() const { return kind == TypeKind::Int || kind == TypeKind::Float; }
 bool Type::isBoolean() const { return kind == TypeKind::Bool; }
 bool Type::isVoid() const { return kind == TypeKind::Void; }
 bool Type::isErrorLike() const { return kind == TypeKind::Error || kind == TypeKind::Unknown; }
 
 std::string Type::toString() const {
+    if (kind == TypeKind::Array) return name;
     if (kind != TypeKind::Function) return name;
     std::ostringstream out;
     out << "function(";
@@ -57,6 +72,10 @@ std::string Type::toString() const {
 bool equivalent(const Type& left, const Type& right) {
     if (left.kind != right.kind) return false;
     if (left.kind == TypeKind::Struct) return left.name == right.name;
+    if (left.kind == TypeKind::Array) {
+        if (!left.elementType || !right.elementType) return false;
+        return left.dimensions == right.dimensions && equivalent(*left.elementType, *right.elementType);
+    }
     if (left.kind == TypeKind::Function) {
         if (!left.returnType || !right.returnType) return false;
         if (!equivalent(*left.returnType, *right.returnType)) return false;

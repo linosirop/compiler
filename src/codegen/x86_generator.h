@@ -4,7 +4,9 @@
 #include "codegen/stack_frame.h"
 #include "ir/basic_block.h"
 
+#include <map>
 #include <ostream>
+#include <set>
 #include <sstream>
 #include <string>
 
@@ -23,6 +25,9 @@ public:
     void generate(const ir::IRProgram& program, std::ostream& out);
 
 private:
+    void collectExternalReferences(const ir::IRProgram& program);
+    void collectStringLiterals(const ir::IRProgram& program);
+    void emitReadOnlyData();
     void generateFunction(const ir::IRFunction& function);
     void emitInstruction(const ir::IRInstruction& instruction);
     bool tryEmitDirectConditionalJump(const ir::IRInstruction& comparison, const ir::IRInstruction& branch);
@@ -42,6 +47,7 @@ private:
     std::string labelFor(const std::string& label) const;
     static std::string normalizeMemoryName(const std::string& operand);
     static bool isIntegerLiteral(const std::string& text);
+    static bool isStringLiteral(const std::string& operand);
     static bool isImmediate(const std::string& operand);
     static std::string immediateValue(const std::string& operand);
     static std::string sanitizeSymbol(const std::string& symbol);
@@ -51,6 +57,8 @@ private:
     StackFrame frame_;
     std::ostringstream out_;
     std::string currentFunction_;
+    std::map<std::string, std::string> stringLabels_;
+    std::set<std::string> externalCalls_;
 };
 
 std::string generateX86Assembly(const ir::IRProgram& program);

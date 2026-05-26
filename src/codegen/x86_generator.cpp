@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <iomanip>
+#include <set>
 #include <stdexcept>
 
 namespace codegen {
@@ -13,9 +15,15 @@ X86Generator::X86Generator(X86GeneratorOptions options) : options_(options) {}
 std::string X86Generator::generate(const ir::IRProgram& program) {
     out_.str("");
     out_.clear();
+    stringLabels_.clear();
+    externalCalls_.clear();
+    collectStringLiterals(program);
+    collectExternalReferences(program);
+
     out_ << "; MiniCompiler x86-64 assembly\n";
     out_ << "; Target: NASM, ELF64, System V AMD64 ABI\n";
     out_ << "default rel\n\n";
+    emitReadOnlyData();
     out_ << "section .text\n";
 
     for (const auto& function : program.functions) {
@@ -25,12 +33,74 @@ std::string X86Generator::generate(const ir::IRProgram& program) {
     out_ << "extern print_int\n";
     out_ << "extern print_string\n";
     out_ << "extern read_int\n";
-    out_ << "extern exit\n\n";
+    out_ << "extern exit\n";
+    for (const auto& callee : externalCalls_) {
+        if (callee != "print_int" && callee != "print_string" && callee != "read_int" && callee != "exit") {
+            out_ << "extern " << sanitizeSymbol(callee) << "\n";
+        }
+    }
+    out_ << "\n";
 
     for (const auto& function : program.functions) {
         if (function.name != "__global") generateFunction(function);
     }
     return out_.str();
+}
+
+void X86Generator::collectStringLiterals(const ir::IRProgram& program) {
+    int count = 0;
+    for (const auto& function : program.functions) {
+        for (const auto& block : function.blocks) {
+            for (const auto& instruction : block.instructions) {
+                for (const auto& operand : instruction.operands) {
+                    if (isStringLiteral(operand) && stringLabels_.find(operand) == stringLabels_.end()) {
+                        stringLabels_[operand] = ".L.str" + std::to_string(count++);
+                    }
+                }
+            }
+        }
+    }
+}
+
+void X86Generator::collectExternalReferences(const ir::IRProgram& program) {
+    std::set<std::string> defined;
+    for (const auto& function : program.functions) defined.insert(function.name);
+    for (const auto& function : program.functions) {
+        for (const auto& block : function.blocks) {
+            for (const auto& instruction : block.instructions) {
+                if (instruction.opcode == ir::Opcode::CALL && !instruction.operands.empty()) {
+                    const std::string& callee = instruction.operands.front();
+                    if (defined.find(callee) == defined.end()) externalCalls_.insert(callee);
+                }
+            }
+        }
+    }
+}
+
+void X86Generator::emitReadOnlyData() {
+    if (stringLabels_.empty()) return;
+    out_ << "section .rodata\n";
+    for (const auto& entry : stringLabels_) {
+        out_ << entry.second << ": db ";
+        const std::string& literal = entry.first;
+        bool first = true;
+        for (size_t i = 1; i + 1 < literal.size(); ++i) {
+            unsigned char ch = static_cast<unsigned char>(literal[i]);
+            if (!first) out_ << ", ";
+            first = false;
+            if (ch == '\\' && i + 1 < literal.size() - 1) {
+                char next = literal[++i];
+                if (next == 'n') out_ << "10";
+                else if (next == 't') out_ << "9";
+                else out_ << static_cast<int>(static_cast<unsigned char>(next));
+            } else {
+                out_ << static_cast<int>(ch);
+            }
+        }
+        if (!first) out_ << ", ";
+        out_ << "0\n";
+    }
+    out_ << "\n";
 }
 
 void X86Generator::generate(const ir::IRProgram& program, std::ostream& out) {
@@ -291,6 +361,7 @@ void X86Generator::emitCall(const ir::IRInstruction& instruction) {
         out_ << "    mov " << argRegs[i] << ", rax\n";
     }
 
+    if (callee == "printf" || callee == "scanf") out_ << "    xor eax, eax    ; variadic call: no vector registers used\n";
     out_ << "    call " << callee << "\n";
     if (stackArgCount > 0) {
         out_ << "    add rsp, " << stackArgCount * static_cast<size_t>(SystemVAbi::slotSizeBytes()) << "\n";
@@ -299,6 +370,13 @@ void X86Generator::emitCall(const ir::IRInstruction& instruction) {
 }
 
 void X86Generator::loadOperand(const std::string& operand, const std::string& reg) {
+    if (isStringLiteral(operand)) {
+        auto found = stringLabels_.find(operand);
+        if (found != stringLabels_.end()) {
+            out_ << "    lea " << reg << ", [rel " << found->second << "]\n";
+            return;
+        }
+    }
     if (isImmediate(operand)) {
         out_ << "    mov " << reg << ", " << immediateValue(operand) << "\n";
         return;
@@ -339,6 +417,10 @@ bool X86Generator::isIntegerLiteral(const std::string& text) {
     return std::all_of(text.begin() + static_cast<std::string::difference_type>(start), text.end(), [](char ch) {
         return std::isdigit(static_cast<unsigned char>(ch)) != 0;
     });
+}
+
+bool X86Generator::isStringLiteral(const std::string& operand) {
+    return operand.size() >= 2 && operand.front() == '"' && operand.back() == '"';
 }
 
 bool X86Generator::isImmediate(const std::string& operand) {

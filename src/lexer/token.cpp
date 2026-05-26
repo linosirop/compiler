@@ -17,6 +17,7 @@ std::string Token::to_string() const {
     case TokenType::KW_VOID:   oss << "KW_VOID";   break;
     case TokenType::KW_STRUCT: oss << "KW_STRUCT"; break;
     case TokenType::KW_FN:     oss << "KW_FN";     break;
+    case TokenType::KW_EXTERN: oss << "KW_EXTERN"; break;
     case TokenType::KW_TRUE:   oss << "KW_TRUE";   break;
     case TokenType::KW_FALSE:  oss << "KW_FALSE";  break;
 

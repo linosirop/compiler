@@ -31,6 +31,7 @@ private:
 
     DeclPtr parseDeclaration();
     DeclPtr parseFunctionDeclaration();
+    DeclPtr parseExternalDeclaration();
     DeclPtr parseStructDeclaration();
     std::shared_ptr<VarDeclStmtNode> parseVariableDeclarationAfterType(const std::string& type, const Token& typeToken);
 

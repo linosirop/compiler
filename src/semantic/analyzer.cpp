@@ -110,6 +110,7 @@ void SemanticAnalyzer::analyzeDeclaration(const DeclPtr& decl) {
 }
 
 void SemanticAnalyzer::analyzeFunction(const FunctionDeclNode& node) {
+    if (node.isExtern) return;
     currentFunction_ = node.name;
     currentReturnType_ = resolveTypeName(node.returnType, node.line, node.column);
     symbols_.enter_scope("function " + node.name);
@@ -167,6 +168,9 @@ void SemanticAnalyzer::analyzeBlock(const BlockStmtNode& node, bool createScope)
 
 void SemanticAnalyzer::analyzeVariableDeclaration(const VarDeclStmtNode& node, SymbolKind kind) {
     Type declaredType = resolveTypeName(node.type, node.line, node.column);
+    if (node.isArray()) {
+        declaredType = Type::arrayType(declaredType, node.arrayDimensions);
+    }
     if (declaredType.kind == TypeKind::Void) {
         addError("type mismatch", "variable '" + node.name + "' cannot have type void", node.line, node.column);
     }
@@ -189,6 +193,16 @@ void SemanticAnalyzer::analyzeVariableDeclaration(const VarDeclStmtNode& node, S
         Type initType = analyzeExpression(node.initializer);
         if (!canAssign(declaredType, initType)) {
             addError("type mismatch", "cannot initialize '" + node.name + "' of type " + declaredType.toString() + " with " + initType.toString(), node.initializer->line, node.initializer->column);
+        }
+        if (SymbolInfo* inserted = symbols_.lookup(node.name)) inserted->initialized = true;
+    }
+    if (!node.arrayInitializers.empty()) {
+        Type elementType = declaredType.kind == TypeKind::Array && declaredType.elementType ? *declaredType.elementType : declaredType;
+        for (const auto& value : node.arrayInitializers) {
+            Type initType = analyzeExpression(value);
+            if (!canAssign(elementType, initType)) {
+                addError("type mismatch", "array initializer for '" + node.name + "' expects " + elementType.toString() + ", found " + initType.toString(), value ? value->line : node.line, value ? value->column : node.column);
+            }
         }
         if (SymbolInfo* inserted = symbols_.lookup(node.name)) inserted->initialized = true;
     }
@@ -239,6 +253,7 @@ Type SemanticAnalyzer::analyzeExpression(const ExprPtr& expr) {
     if (auto binary = std::dynamic_pointer_cast<BinaryExprNode>(expr)) return analyzeBinary(*binary);
     if (auto unary = std::dynamic_pointer_cast<UnaryExprNode>(expr)) return analyzeUnary(*unary);
     if (auto assign = std::dynamic_pointer_cast<AssignmentExprNode>(expr)) return analyzeAssignment(*assign);
+    if (auto access = std::dynamic_pointer_cast<ArrayAccessExprNode>(expr)) return analyzeArrayAccess(*access);
     if (auto call = std::dynamic_pointer_cast<CallExprNode>(expr)) return analyzeCall(*call);
     return Type::unknown();
 }
@@ -306,36 +321,55 @@ Type SemanticAnalyzer::analyzeUnary(const UnaryExprNode& node) {
 }
 
 Type SemanticAnalyzer::analyzeAssignment(const AssignmentExprNode& node) {
-    auto id = std::dynamic_pointer_cast<IdentifierExprNode>(node.target);
-    if (!id) {
-        addError("invalid assignment target", "left side of assignment must be an identifier", node.line, node.column);
-        Type type = Type::error();
-        annotate(node, type);
-        return type;
-    }
+    Type targetType = Type::error();
+    SymbolInfo* symbol = nullptr;
 
-    SymbolInfo* symbol = symbols_.lookup(id->name);
-    if (!symbol) {
-        addError("undeclared identifier", "identifier '" + id->name + "' is not declared", id->line, id->column);
-        Type type = Type::error();
-        annotate(node, type);
-        return type;
+    if (auto id = std::dynamic_pointer_cast<IdentifierExprNode>(node.target)) {
+        symbol = symbols_.lookup(id->name);
+        if (!symbol) {
+            addError("undeclared identifier", "identifier '" + id->name + "' is not declared", id->line, id->column);
+            annotate(node, Type::error());
+            return Type::error();
+        }
+        targetType = symbol->type;
+    } else if (auto access = std::dynamic_pointer_cast<ArrayAccessExprNode>(node.target)) {
+        targetType = analyzeArrayAccess(*access);
+    } else {
+        addError("invalid assignment target", "left side of assignment must be an identifier or array element", node.line, node.column);
+        annotate(node, Type::error());
+        return Type::error();
     }
 
     Type valueType = analyzeExpression(node.value);
-    if (node.op == "=" && !canAssign(symbol->type, valueType)) {
-        addError("type mismatch", "cannot assign " + valueType.toString() + " to '" + id->name + "' of type " + symbol->type.toString(), node.line, node.column);
+    if (node.op == "=" && !canAssign(targetType, valueType)) {
+        addError("type mismatch", "cannot assign " + valueType.toString() + " to target of type " + targetType.toString(), node.line, node.column);
     }
     if (node.op != "=") {
-        Type result = arithmeticResult(symbol->type, valueType, node.op.substr(0, 1));
-        if (result.kind == TypeKind::Error || !canAssign(symbol->type, result)) {
-            addError("type mismatch", "compound assignment '" + node.op + "' is incompatible with " + symbol->type.toString() + " and " + valueType.toString(), node.line, node.column);
+        Type result = arithmeticResult(targetType, valueType, node.op.substr(0, 1));
+        if (result.kind == TypeKind::Error || !canAssign(targetType, result)) {
+            addError("type mismatch", "compound assignment '" + node.op + "' is incompatible with " + targetType.toString() + " and " + valueType.toString(), node.line, node.column);
         }
     }
 
-    symbol->initialized = true;
-    annotate(node, symbol->type);
-    return symbol->type;
+    if (symbol) symbol->initialized = true;
+    annotate(node, targetType);
+    return targetType;
+}
+
+Type SemanticAnalyzer::analyzeArrayAccess(const ArrayAccessExprNode& node) {
+    Type arrayType = analyzeExpression(node.array);
+    Type indexType = analyzeExpression(node.index);
+    if (!indexType.isErrorLike() && indexType.kind != TypeKind::Int) {
+        addError("type mismatch", "array index must be int, found " + indexType.toString(), node.index ? node.index->line : node.line, node.index ? node.index->column : node.column);
+    }
+    if (arrayType.kind != TypeKind::Array || !arrayType.elementType) {
+        addError("type mismatch", "subscript operator requires array, found " + arrayType.toString(), node.line, node.column);
+        annotate(node, Type::error());
+        return Type::error();
+    }
+    Type element = *arrayType.elementType;
+    annotate(node, element);
+    return element;
 }
 
 Type SemanticAnalyzer::analyzeCall(const CallExprNode& node) {
@@ -375,6 +409,9 @@ Type SemanticAnalyzer::resolveTypeName(const std::string& name, int line, int co
     if (name == "bool") return Type::boolType();
     if (name == "void") return Type::voidType();
     if (name == "string") return Type::stringType();
+    if (name.size() >= 2 && name.substr(name.size() - 2) == "[]") {
+        return Type::arrayType(resolveTypeName(name.substr(0, name.size() - 2), line, column), {0});
+    }
 
     const SymbolInfo* symbol = symbols_.lookup(name);
     if (symbol && symbol->kind == SymbolKind::Struct) return Type::structType(name);

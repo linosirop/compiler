@@ -3,6 +3,7 @@
 #include "semantic/analyzer.h"
 #include "ir/ir_generator.h"
 #include "ir/control_flow.h"
+#include "ir/optimizer.h"
 
 #include <iostream>
 #include <sstream>
@@ -218,6 +219,41 @@ int main() {
         check(contains(dot, "->"), "ir: DOT output contains CFG edges", dot);
         check(contains(program.statistics(), "Basic blocks:"), "ir: statistics report basic blocks", program.statistics());
         check(contains(ir::validateControlFlow(program), "jump targets: ok"), "ir: validation report checks jump targets", ir::validateControlFlow(program));
+    }
+
+
+
+    {
+        std::string source =
+            "fn main() -> int {\n"
+            "    int x = 10 + 20;\n"
+            "    int y = x * 2;\n"
+            "    if (y > 50) { return 1; } else { return 0; }\n"
+            "}\n";
+        ir::IRProgram program;
+        std::string errors;
+        bool ok = compileToIR(source, program, errors);
+        check(ok, "ir optimizer: optimization sample compiles", errors);
+        ir::OptimizationReport report = ir::optimizeProgram(program);
+        std::string text = program.toText();
+        check(report.constantFolds > 0, "ir optimizer: constant folding reports changes", report.toString());
+        check(report.constantsPropagated > 0, "ir optimizer: constant propagation reports changes", report.toString());
+        check(contains(report.toString(), "Optimization Report"), "ir optimizer: report is printable", report.toString());
+        check(contains(text, "MOVE 30") || contains(text, "MOVE 60") || contains(text, "RETURN 1"),
+              "ir optimizer: optimized IR contains folded constants", text);
+    }
+
+    {
+        std::string source =
+            "fn main() -> int {\n"
+            "    int arr[3] = {1, 2, 3};\n"
+            "    arr[1] = arr[1] + 4;\n"
+            "    return arr[0] + arr[1] + arr[2];\n"
+            "}\n";
+        std::string text = irText(source);
+        check(contains(text, "declare array int arr"), "ir arrays: static array declaration is emitted", text);
+        check(contains(text, "arr[1] = initializer") || contains(text, "array slot arr[1]"), "ir arrays: element slots are emitted", text);
+        check(contains(text, "load array element"), "ir arrays: element load is emitted", text);
     }
 
     std::cout << "\nPassed: " << passed << "\n";

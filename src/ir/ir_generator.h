@@ -38,6 +38,8 @@ private:
     std::string generateExpression(const ExprPtr& expr);
     std::string generateLiteral(const LiteralExprNode& node);
     std::string generateIdentifier(const IdentifierExprNode& node);
+    std::string generateArrayAccess(const ArrayAccessExprNode& node);
+    std::string generateArrayElementLocation(const ArrayAccessExprNode& node);
     std::string generateBinary(const BinaryExprNode& node);
     std::string generateShortCircuitLogical(const BinaryExprNode& node);
     std::string generateUnary(const UnaryExprNode& node);

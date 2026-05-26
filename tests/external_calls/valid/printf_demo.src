@@ -1,0 +1,5 @@
+extern int printf(string fmt, int value);
+fn main() -> int {
+    printf("answer=%d\n", 42);
+    return 0;
+}

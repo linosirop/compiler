@@ -14,6 +14,7 @@ enum class TypeKind {
     String,
     Struct,
     Function,
+    Array,
     Unknown,
     Error
 };
@@ -23,6 +24,8 @@ struct Type {
     std::string name;
     std::vector<Type> parameters;
     std::shared_ptr<Type> returnType;
+    std::shared_ptr<Type> elementType;
+    std::vector<int> dimensions;
 
     Type() = default;
     explicit Type(TypeKind kind);
@@ -35,6 +38,7 @@ struct Type {
     static Type stringType();
     static Type structType(const std::string& name);
     static Type functionType(std::vector<Type> params, Type ret);
+    static Type arrayType(Type element, std::vector<int> dimensions);
     static Type unknown();
     static Type error();
 

@@ -10,6 +10,7 @@
 #include "semantic/analyzer.h"
 #include "ir/ir_generator.h"
 #include "ir/control_flow.h"
+#include "ir/optimizer.h"
 #include "codegen/x86_generator.h"
 
 namespace {
@@ -39,8 +40,8 @@ void printUsage() {
               << "  compiler parse --input <file.src> [--ast-format text|dot] [--output-file <file>] [--verbose]\n"
               << "  compiler check --input <file.src> [--output-file <file>] [--show-types] [--verbose]\n"
               << "  compiler symbols --input <file.src> [--output-file <file>]\n"
-              << "  compiler ir --input <file.src> [--format text|dot] [--output-file <file>] [--stats] [--validate]\n"
-              << "  compiler compile --input <file.src> --output <file.asm> [--target x86_64] [--emit-stack-map]\n";
+              << "  compiler ir --input <file.src> [--format text|dot] [--output-file <file>] [--stats] [--validate] [--optimize] [--optimization-report]\n"
+              << "  compiler compile --input <file.src> --output <file.asm> [--target x86_64] [--emit-stack-map] [--optimize] [--optimization-report]\n";
 }
 
 std::string getArg(int argc, char* argv[], const std::string& name, const std::string& defaultValue = "") {
@@ -184,6 +185,10 @@ int main(int argc, char* argv[]) {
 
             ir::IRGenerator generator(&analyzer.get_symbol_table());
             ir::IRProgram irProgram = generator.generate(program);
+            ir::OptimizationReport optimizationReport;
+            if (hasArg(argc, argv, "--optimize")) {
+                optimizationReport = ir::optimizeProgram(irProgram);
+            }
 
             if (command == "compile") {
                 std::string target = getArg(argc, argv, "--target", "x86_64");
@@ -204,6 +209,9 @@ int main(int argc, char* argv[]) {
                 codegen::X86Generator x86(options);
                 writeText(outputPath, x86.generate(irProgram));
                 std::cout << "Assembly written to " << outputPath << "\n";
+                if (hasArg(argc, argv, "--optimization-report")) {
+                    std::cout << optimizationReport.toString();
+                }
                 return 0;
             }
 
@@ -222,6 +230,7 @@ int main(int argc, char* argv[]) {
             }
 
             if (hasArg(argc, argv, "--stats")) out << "\n" << irProgram.statistics();
+            if (hasArg(argc, argv, "--optimization-report")) out << "\n" << optimizationReport.toString();
             if (hasArg(argc, argv, "--validate")) out << "\n" << ir::validateControlFlow(irProgram);
 
             writeText(outputPath, out.str());

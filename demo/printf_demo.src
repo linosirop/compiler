@@ -1,0 +1,5 @@
+extern int printf(string fmt, int value);
+fn main() -> int {
+    printf("MiniCompiler result: %d\n", 42);
+    return 0;
+}

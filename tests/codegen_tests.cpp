@@ -2,6 +2,7 @@
 #include "parser/parser.h"
 #include "semantic/analyzer.h"
 #include "ir/ir_generator.h"
+#include "ir/optimizer.h"
 #include "codegen/x86_generator.h"
 
 #include <iostream>
@@ -146,6 +147,39 @@ int main() {
         check(contains(assembly, ".main_L_while_end"), "codegen: emits while exit label", assembly);
         check(contains(assembly, "jl .main_L_while_body") || contains(assembly, "jne .main_L_while_body"),
               "codegen: emits conditional loop branch", assembly);
+    }
+
+
+
+    {
+        std::string source =
+            "fn main() -> int {\n"
+            "    int arr[3] = {1, 2, 3};\n"
+            "    return arr[0] + arr[1] + arr[2];\n"
+            "}\n";
+        std::string assembly;
+        std::string errors;
+        bool ok = compileToAssembly(source, assembly, errors);
+        check(ok, "codegen arrays: static array source compiles", errors);
+        check(contains(assembly, "array slot arr[0]"), "codegen arrays: emits array stack slots", assembly);
+        check(contains(assembly, "load array element"), "codegen arrays: emits array element loads", assembly);
+    }
+
+    {
+        std::string source =
+            "extern int printf(string fmt, int value);\n"
+            "fn main() -> int {\n"
+            "    printf(\"answer=%d\\n\", 42);\n"
+            "    return 0;\n"
+            "}\n";
+        std::string assembly;
+        std::string errors;
+        bool ok = compileToAssembly(source, assembly, errors);
+        check(ok, "codegen external: printf source compiles", errors);
+        check(contains(assembly, "extern printf"), "codegen external: declares printf external", assembly);
+        check(contains(assembly, "section .rodata"), "codegen external: emits string literal section", assembly);
+        check(contains(assembly, "xor eax, eax"), "codegen external: sets AL for variadic call", assembly);
+        check(contains(assembly, "call printf"), "codegen external: emits printf call", assembly);
     }
 
     std::cout << "\nPassed: " << passed << "\n";

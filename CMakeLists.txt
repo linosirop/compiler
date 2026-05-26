@@ -27,6 +27,7 @@ add_library(compiler_core STATIC
     src/ir/basic_block.cpp
     src/ir/control_flow.cpp
     src/ir/ir_generator.cpp
+    src/ir/optimizer.cpp
 
     src/codegen/abi.cpp
     src/codegen/stack_frame.cpp
@@ -34,6 +35,9 @@ add_library(compiler_core STATIC
     src/codegen/label_manager.cpp
     src/codegen/control_flow_generator.cpp
     src/codegen/expression_generator.cpp
+    src/codegen/array_generator.cpp
+    src/codegen/external_calls.cpp
+    src/codegen/optimization_passes.cpp
     src/codegen/x86_generator.cpp
 )
 

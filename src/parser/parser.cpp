@@ -85,6 +85,7 @@ void Parser::synchronize() {
 
         switch (peek().type) {
         case TokenType::KW_FN:
+        case TokenType::KW_EXTERN:
         case TokenType::KW_STRUCT:
         case TokenType::KW_IF:
         case TokenType::KW_WHILE:
@@ -123,6 +124,10 @@ ParamNode Parser::parseParameter() {
     param.type = parseTypeName();
     const Token& name = consume(TokenType::IDENTIFIER, "Expected parameter name");
     param.name = name.lexeme;
+    if (match(TokenType::LBRACKET)) {
+        consume(TokenType::RBRACKET, "Expected ] after array parameter");
+        param.type += "[]";
+    }
     param.line = typeToken.line;
     param.column = typeToken.column;
     return param;
@@ -130,6 +135,7 @@ ParamNode Parser::parseParameter() {
 
 DeclPtr Parser::parseDeclaration() {
     if (match(TokenType::KW_FN)) return parseFunctionDeclaration();
+    if (match(TokenType::KW_EXTERN)) return parseExternalDeclaration();
     if (match(TokenType::KW_STRUCT)) return parseStructDeclaration();
 
     if (isTypeToken(peek().type)) {
@@ -144,6 +150,57 @@ DeclPtr Parser::parseDeclaration() {
 
     errorAtCurrent("Expected declaration");
     throw std::runtime_error("Expected declaration");
+}
+
+DeclPtr Parser::parseExternalDeclaration() {
+    Token externToken = previous();
+
+    // MiniCompiler accepts both forms:
+    //   extern fn printf(string fmt, int value) -> int;
+    //   extern int printf(string fmt, int value);
+    bool sawFn = match(TokenType::KW_FN);
+    std::string returnType = "void";
+    if (!sawFn) {
+        returnType = parseTypeName();
+    }
+
+    const Token& name = consume(TokenType::IDENTIFIER, "Expected external function name");
+    consume(TokenType::LPAREN, "Expected '(' after external function name");
+
+    std::vector<ParamNode> params;
+    bool variadic = false;
+    if (!check(TokenType::RPAREN)) {
+        do {
+            if (check(TokenType::RBRACE)) break;
+            if (check(TokenType::COMMA) && tokens_[current_ + 1].lexeme == "...") {
+                advance();
+                variadic = true;
+                break;
+            }
+            if (peek().lexeme == "...") {
+                advance();
+                variadic = true;
+                break;
+            }
+            params.push_back(parseParameter());
+        } while (match(TokenType::COMMA));
+    }
+    consume(TokenType::RPAREN, "Expected ')' after external parameters");
+
+    if (sawFn && match(TokenType::ARROW)) {
+        returnType = parseTypeName();
+    }
+    consume(TokenType::SEMICOLON, "Expected ';' after external declaration");
+
+    auto fn = std::make_shared<FunctionDeclNode>();
+    fn->line = externToken.line;
+    fn->column = externToken.column;
+    fn->name = name.lexeme;
+    fn->returnType = returnType;
+    fn->parameters = std::move(params);
+    fn->isExtern = true;
+    fn->isVariadic = variadic;
+    return fn;
 }
 
 DeclPtr Parser::parseFunctionDeclaration() {
@@ -199,10 +256,35 @@ DeclPtr Parser::parseStructDeclaration() {
 std::shared_ptr<VarDeclStmtNode> Parser::parseVariableDeclarationAfterType(const std::string& type, const Token& typeToken) {
     const Token& name = consume(TokenType::IDENTIFIER, "Expected variable name");
     ExprPtr initializer = nullptr;
-    if (match(TokenType::ASSIGN)) initializer = parseExpression();
+    std::vector<int> dimensions;
+    std::vector<ExprPtr> arrayInitializers;
+
+    while (match(TokenType::LBRACKET)) {
+        int size = 0;
+        if (check(TokenType::INT_LITERAL)) {
+            size = std::stoi(advance().lexeme);
+        }
+        consume(TokenType::RBRACKET, "Expected ']' after array size");
+        dimensions.push_back(size);
+    }
+
+    if (match(TokenType::ASSIGN)) {
+        if (!dimensions.empty() && match(TokenType::LBRACE)) {
+            if (!check(TokenType::RBRACE)) {
+                do {
+                    arrayInitializers.push_back(parseExpression());
+                } while (match(TokenType::COMMA));
+            }
+            consume(TokenType::RBRACE, "Expected '}' after array initializer");
+        } else {
+            initializer = parseExpression();
+        }
+    }
     consume(TokenType::SEMICOLON, "Expected ';' after variable declaration");
 
     auto var = std::make_shared<VarDeclStmtNode>(type, name.lexeme, initializer);
+    var->arrayDimensions = std::move(dimensions);
+    var->arrayInitializers = std::move(arrayInitializers);
     var->line = typeToken.line;
     var->column = typeToken.column;
     return var;
@@ -382,7 +464,7 @@ ExprPtr Parser::parseAssignment() {
     if (matchAny({TokenType::ASSIGN, TokenType::PLUS_EQUAL, TokenType::MINUS_EQUAL, TokenType::STAR_EQUAL, TokenType::SLASH_EQUAL})) {
         Token op = previous();
 
-        if (!std::dynamic_pointer_cast<IdentifierExprNode>(expr)) {
+        if (!std::dynamic_pointer_cast<IdentifierExprNode>(expr) && !std::dynamic_pointer_cast<ArrayAccessExprNode>(expr)) {
             errors_.push_back("Syntax error at " + std::to_string(op.line) + ":" + std::to_string(op.column) +
                 ": Invalid assignment target");
             throw std::runtime_error("Invalid assignment target");
@@ -488,6 +570,7 @@ ExprPtr Parser::parsePrimary() {
 
     if (match(TokenType::IDENTIFIER)) {
         Token name = previous();
+        ExprPtr expr;
         if (match(TokenType::LPAREN)) {
             std::vector<ExprPtr> args;
             if (!check(TokenType::RPAREN)) {
@@ -496,11 +579,22 @@ ExprPtr Parser::parsePrimary() {
             consume(TokenType::RPAREN, "Expected ')' after function arguments");
             auto call = std::make_shared<CallExprNode>(name.lexeme, std::move(args));
             call->line = name.line; call->column = name.column;
-            return call;
+            expr = call;
+        } else {
+            auto node = std::make_shared<IdentifierExprNode>(name.lexeme);
+            node->line = name.line; node->column = name.column;
+            expr = node;
         }
-        auto node = std::make_shared<IdentifierExprNode>(name.lexeme);
-        node->line = name.line; node->column = name.column;
-        return node;
+
+        while (match(TokenType::LBRACKET)) {
+            ExprPtr index = parseExpression();
+            consume(TokenType::RBRACKET, "Expected ']' after array index");
+            auto access = std::make_shared<ArrayAccessExprNode>(expr, index);
+            access->line = name.line;
+            access->column = name.column;
+            expr = access;
+        }
+        return expr;
     }
 
     if (match(TokenType::LPAREN)) {

@@ -43,10 +43,14 @@ semantic::Type IRGenerator::parseType(const std::string& name) const {
     if (name == "bool") return semantic::Type::boolType();
     if (name == "void") return semantic::Type::voidType();
     if (name == "string") return semantic::Type::stringType();
+    if (name.size() >= 2 && name.substr(name.size() - 2) == "[]") {
+        return semantic::Type::arrayType(parseType(name.substr(0, name.size() - 2)), {0});
+    }
     return semantic::Type::structType(name);
 }
 
 void IRGenerator::generateFunction(const FunctionDeclNode& node) {
+    if (node.isExtern) return;
     IRFunction function(node.name);
     function.returnType = parseType(node.returnType);
     for (const auto& param : node.parameters) {
@@ -92,6 +96,24 @@ std::string IRGenerator::locationForVariable(const std::string& name) {
 
 void IRGenerator::generateVariableDeclaration(const VarDeclStmtNode& node) {
     std::string location = locationForVariable(node.name);
+    if (node.isArray()) {
+        int totalElements = 1;
+        for (int dim : node.arrayDimensions) totalElements *= dim > 0 ? dim : 1;
+        emit(Opcode::ALLOCA, location.substr(1, location.size() - 2), {node.type + "[]", std::to_string(totalElements)},
+             "declare array " + node.type + " " + node.name);
+        for (int i = 0; i < totalElements; ++i) {
+            const std::string elementName = currentFunction_->localName(node.name + "_elem" + std::to_string(i));
+            emit(Opcode::ALLOCA, elementName, {node.type}, "array slot " + node.name + "[" + std::to_string(i) + "]");
+            if (static_cast<size_t>(i) < node.arrayInitializers.size()) {
+                std::string value = generateExpression(node.arrayInitializers[static_cast<size_t>(i)]);
+                emit(Opcode::STORE, "[" + elementName + "]", {value}, node.name + "[" + std::to_string(i) + "] = initializer");
+            } else {
+                emit(Opcode::STORE, "[" + elementName + "]", {"0"}, node.name + "[" + std::to_string(i) + "] = zero");
+            }
+        }
+        return;
+    }
+
     emit(Opcode::ALLOCA, location.substr(1, location.size() - 2), {node.type}, "declare " + node.type + " " + node.name);
     if (node.initializer) {
         std::string value = generateExpression(node.initializer);
@@ -187,6 +209,7 @@ std::string IRGenerator::generateExpression(const ExprPtr& expr) {
     if (!expr) return "";
     if (auto literal = std::dynamic_pointer_cast<LiteralExprNode>(expr)) return generateLiteral(*literal);
     if (auto id = std::dynamic_pointer_cast<IdentifierExprNode>(expr)) return generateIdentifier(*id);
+    if (auto access = std::dynamic_pointer_cast<ArrayAccessExprNode>(expr)) return generateArrayAccess(*access);
     if (auto binary = std::dynamic_pointer_cast<BinaryExprNode>(expr)) return generateBinary(*binary);
     if (auto unary = std::dynamic_pointer_cast<UnaryExprNode>(expr)) return generateUnary(*unary);
     if (auto assignment = std::dynamic_pointer_cast<AssignmentExprNode>(expr)) return generateAssignment(*assignment);
@@ -199,6 +222,23 @@ std::string IRGenerator::generateLiteral(const LiteralExprNode& node) { return n
 std::string IRGenerator::generateIdentifier(const IdentifierExprNode& node) {
     std::string temp = currentFunction_->newTemp();
     emit(Opcode::LOAD, temp, {locationForVariable(node.name)}, "load " + node.name);
+    return temp;
+}
+
+std::string IRGenerator::generateArrayElementLocation(const ArrayAccessExprNode& node) {
+    auto id = std::dynamic_pointer_cast<IdentifierExprNode>(node.array);
+    auto literal = std::dynamic_pointer_cast<LiteralExprNode>(node.index);
+    if (!id || !literal) {
+        return "[" + currentFunction_->localName("array_dynamic_unsupported") + "]";
+    }
+    const std::string elementName = currentFunction_->localName(id->name + "_elem" + literal->value);
+    return "[" + elementName + "]";
+}
+
+std::string IRGenerator::generateArrayAccess(const ArrayAccessExprNode& node) {
+    std::string temp = currentFunction_->newTemp();
+    std::string location = generateArrayElementLocation(node);
+    emit(Opcode::LOAD, temp, {location}, "load array element");
     return temp;
 }
 
@@ -282,6 +322,22 @@ std::string IRGenerator::generateUnary(const UnaryExprNode& node) {
 }
 
 std::string IRGenerator::generateAssignment(const AssignmentExprNode& node) {
+    if (auto access = std::dynamic_pointer_cast<ArrayAccessExprNode>(node.target)) {
+        std::string location = generateArrayElementLocation(*access);
+        if (node.op == "=") {
+            std::string value = generateExpression(node.value);
+            emit(Opcode::STORE, location, {value}, "array element = value");
+            return value;
+        }
+        std::string oldValue = generateArrayAccess(*access);
+        std::string right = generateExpression(node.value);
+        std::string result = currentFunction_->newTemp();
+        std::string binaryOp = node.op.substr(0, 1);
+        emit(opcodeForBinary(binaryOp), result, {oldValue, right}, "array element " + node.op + " value");
+        emit(Opcode::STORE, location, {result}, "array element = result");
+        return result;
+    }
+
     auto id = std::dynamic_pointer_cast<IdentifierExprNode>(node.target);
     if (!id) return generateExpression(node.value);
 

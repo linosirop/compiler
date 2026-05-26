@@ -61,6 +61,13 @@ struct AssignmentExprNode : ExpressionNode {
         : target(std::move(target)), op(op), value(std::move(value)) {}
 };
 
+struct ArrayAccessExprNode : ExpressionNode {
+    ExprPtr array;
+    ExprPtr index;
+    ArrayAccessExprNode(ExprPtr array, ExprPtr index)
+        : array(std::move(array)), index(std::move(index)) {}
+};
+
 struct CallExprNode : ExpressionNode {
     std::string callee;
     std::vector<ExprPtr> arguments;
@@ -83,6 +90,11 @@ struct VarDeclStmtNode : StatementNode {
     std::string type;
     std::string name;
     ExprPtr initializer;
+    std::vector<int> arrayDimensions;
+    std::vector<ExprPtr> arrayInitializers;
+
+    bool isArray() const { return !arrayDimensions.empty(); }
+
     VarDeclStmtNode(const std::string& type, const std::string& name, ExprPtr initializer)
         : type(type), name(name), initializer(std::move(initializer)) {}
 };
@@ -114,6 +126,8 @@ struct FunctionDeclNode : DeclarationNode {
     std::string name;
     std::vector<ParamNode> parameters;
     std::shared_ptr<BlockStmtNode> body;
+    bool isExtern = false;
+    bool isVariadic = false;
 };
 
 struct StructDeclNode : DeclarationNode {

@@ -51,6 +51,7 @@ private:
     Type analyzeBinary(const BinaryExprNode& node);
     Type analyzeUnary(const UnaryExprNode& node);
     Type analyzeAssignment(const AssignmentExprNode& node);
+    Type analyzeArrayAccess(const ArrayAccessExprNode& node);
     Type analyzeCall(const CallExprNode& node);
 
     Type resolveTypeName(const std::string& name, int line, int column);
