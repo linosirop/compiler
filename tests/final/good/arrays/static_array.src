@@ -1,0 +1,5 @@
+fn main() -> int {
+    int arr[3] = {1, 2, 3};
+    arr[1] = arr[1] + 4;
+    return arr[0] + arr[1] + arr[2];
+}

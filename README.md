@@ -6,7 +6,7 @@ MiniCompiler — это учебный компилятор на C++17 для у
 
 
 
-Проект реализует основные этапы компиляции:
+Проект реализован по спринтам и постепенно проходит все основные этапы компиляции:
 
 
 
@@ -20,39 +20,47 @@ MiniCompiler — это учебный компилятор на C++17 для у
 
 5\. \*\*Sprint 5\*\* — генерация x86-64 assembly
 
+6\. \*\*Sprint 6\*\* — сложный control flow и short-circuit
+
+7\. \*\*Sprint 7\*\* — массивы, external calls и оптимизации
+
+8\. \*\*Sprint 8\*\* — финальный CLI, тесты, документация и demo
+
 
 
 \---
 
 
 
-\## 1. Что нужно установить
+\# 1. Требования к окружению
 
 
 
-Проект можно писать на Windows 11, но \*\*Sprint 5 проверяется через WSL Ubuntu\*\*, потому что генерация assembly сделана под:
+Проект можно редактировать на Windows 11, но backend компилятора генерирует Linux x86-64 assembly.
 
 
 
-\- Linux
+Для проверки Sprint 5–8 используется:
+
+
+
+\- WSL2 Ubuntu
+
+\- CMake
+
+\- g++
 
 \- NASM
 
-\- ELF64
+\- GNU ld
 
-\- System V AMD64 ABI
+\- gcc
 
-\- `ld`
-
-\- Linux syscalls
+\- bash
 
 
 
-То есть на Windows проект редактируем, а компиляцию и запуск backend-а делаем через WSL.
-
-
-
-\### Установка инструментов в WSL Ubuntu
+Установка инструментов в WSL Ubuntu:
 
 
 
@@ -60,13 +68,17 @@ MiniCompiler — это учебный компилятор на C++17 для у
 
 sudo apt update
 
-sudo apt install -y build-essential cmake nasm git
+sudo apt install -y build-essential cmake nasm git graphviz
+
+```
 
 
 
-Проверка:
+Проверка версий:
 
 
+
+```bash
 
 g++ --version
 
@@ -76,9 +88,65 @@ nasm -v
 
 ld --version
 
+gcc --version
+
+```
 
 
-3\. Сборка проекта
+
+\---
+
+
+
+\# 2. Где хранить проект
+
+
+
+Рекомендуется хранить проект внутри файловой системы WSL:
+
+
+
+```bash
+
+\~/projects/compiler
+
+```
+
+
+
+Не рекомендуется собирать проект прямо из Windows-папки:
+
+
+
+```bash
+
+/mnt/c/Users/...
+
+```
+
+
+
+Потому что могут возникнуть проблемы с правами, CMake cache и путями.
+
+
+
+Перейти в проект:
+
+
+
+```bash
+
+cd \~/projects/compiler
+
+```
+
+
+
+\---
+
+
+
+\# 3. Сборка проекта
 
 
 
@@ -86,17 +154,25 @@ ld --version
 
 
 
+```bash
+
 cmake -S . -B build -DBUILD\_TESTS=ON -G "Unix Makefiles"
 
 cmake --build build
 
+```
 
 
-Запуск всех тестов:
+
+Запуск стандартных CTest-тестов:
 
 
+
+```bash
 
 ctest --test-dir build --output-on-failure
+
+```
 
 
 
@@ -104,33 +180,187 @@ ctest --test-dir build --output-on-failure
 
 
 
-100% tests passed
+```text
+
+100% tests passed, 0 tests failed out of 5
+
+```
 
 
 
-Sprint 1 — Lexer / Лексический анализатор
+\---
 
 
 
-На этом этапе исходный код разбивается на токены.
+\# 4. Финальная проверка всего проекта
 
 
 
-Пример:
+Для финальной проверки Sprint 8 используется скрипт:
 
 
 
-fn main() {
+```bash
+
+bash scripts/run\_final\_tests.sh
+
+```
+
+
+
+Ожидаемый результат:
+
+
+
+```text
+
+\[final-tests] all final tests passed
+
+```
+
+
+
+Проверить код возврата:
+
+
+
+```bash
+
+echo $?
+
+```
+
+
+
+Ожидаемо:
+
+
+
+```text
+
+0
+
+```
+
+
+
+\---
+
+
+
+\# 5. Два интерфейса компилятора
+
+
+
+В проекте собираются два бинарных файла:
+
+
+
+```bash
+
+./build/compiler
+
+./build/mycc
+
+```
+
+
+
+\## Старый интерфейс `compiler`
+
+
+
+Используется для отдельных стадий компиляции:
+
+
+
+```bash
+
+./build/compiler lex --input examples/hello.src
+
+./build/compiler parse --input examples/hello.src --ast-format text
+
+./build/compiler check --input examples/hello.src --show-types
+
+./build/compiler ir --input examples/factorial.src --stats --validate
+
+./build/compiler compile --input demo/final\_showcase.src --output program.asm --target x86\_64
+
+```
+
+
+
+\## Новый финальный интерфейс `mycc`
+
+
+
+Добавлен в Sprint 8. Он ближе к обычным Unix-компиляторам:
+
+
+
+```bash
+
+./build/mycc --help
+
+./build/mycc --version
+
+./build/mycc -S demo/final\_showcase.src -o final\_showcase.asm
+
+./build/mycc -c demo/final\_showcase.src -o final\_showcase.o
+
+./build/mycc demo/final\_showcase.src -o final\_showcase --optimize
+
+./build/mycc --ast demo/final\_showcase.src
+
+./build/mycc --ir demo/final\_showcase.src --optimize --optimization-report
+
+```
+
+
+
+\---
+
+
+
+\# Sprint 1 — Lexer
+
+
+
+\## Что реализовано
+
+
+
+В Sprint 1 был реализован лексический анализатор.
+
+
+
+Lexer читает исходный `.src` файл и разбивает его на токены.
+
+
+
+Пример исходного кода:
+
+
+
+```c
+
+fn main() -> int {
 
 &#x20;   int x = 42;
 
+&#x20;   return x;
+
 }
 
+```
 
 
-Lexer превращает это в набор токенов:
+
+Lexer превращает его в токены:
 
 
+
+```text
 
 KW\_FN
 
@@ -139,6 +369,10 @@ IDENTIFIER
 LPAREN
 
 RPAREN
+
+ARROW
+
+KW\_INT
 
 LBRACE
 
@@ -152,75 +386,89 @@ INT\_LITERAL
 
 SEMICOLON
 
+KW\_RETURN
+
+IDENTIFIER
+
+SEMICOLON
+
 RBRACE
 
-Запустить lexer
+END\_OF\_FILE
+
+```
+
+
+
+Lexer поддерживает:
+
+
+
+\- ключевые слова;
+
+\- идентификаторы;
+
+\- integer literals;
+
+\- float literals;
+
+\- string literals;
+
+\- boolean literals;
+
+\- операторы;
+
+\- разделители;
+
+\- комментарии;
+
+\- line/column tracking;
+
+\- сообщения об ошибках.
+
+
+
+\## Команды проверки
+
+
+
+Запустить lexer:
+
+
+
+```bash
 
 ./build/compiler lex --input examples/hello.src
 
-Сохранить токены в файл
+```
+
+
+
+Сохранить токены в файл:
+
+
+
+```bash
 
 ./build/compiler lex --input examples/hello.src --output tokens.txt
 
-Посмотреть результат
+```
+
+
+
+Посмотреть результат:
+
+
+
+```bash
 
 cat tokens.txt
 
-Что демонстрирует Sprint 1
-
-распознавание ключевых слов;
-
-распознавание идентификаторов;
-
-распознавание чисел, строк, boolean-значений;
-
-распознавание операторов;
-
-отслеживание line/column;
-
-обработку ошибок lexer-а.
-
-Sprint 2 — Parser / AST
+```
 
 
 
-На этом этапе токены превращаются в синтаксическое дерево — AST.
-
-
-
-AST показывает структуру программы: функции, блоки, переменные, выражения, return и т.д.
-
-
-
-Распарсить файл и вывести AST в консоль
-
-./build/compiler parse --input examples/hello.src --ast-format text
-
-Сохранить AST в файл
-
-./build/compiler parse --input examples/hello.src --ast-format text --output ast.txt
-
-
-
-Посмотреть:
-
-
-
-cat ast.txt
-
-Сгенерировать AST в формате Graphviz DOT
-
-./build/compiler parse --input examples/hello.src --ast-format dot --output ast.dot
-
-Превратить DOT в PNG
-
-
-
-Для этого нужен Graphviz:
-
-
-
-sudo apt install -y graphviz
+\## Что показать преподавателю
 
 
 
@@ -228,111 +476,369 @@ sudo apt install -y graphviz
 
 
 
+```bash
+
+./build/compiler lex --input examples/hello.src
+
+```
+
+
+
+Пояснение:
+
+
+
+```text
+
+На этом этапе исходный текст программы разбивается на поток токенов.
+
+Каждый токен содержит тип, лексему, строку и колонку.
+
+```
+
+
+
+\---
+
+
+
+\# Sprint 2 — Parser и AST
+
+
+
+\## Что реализовано
+
+
+
+В Sprint 2 был реализован парсер.
+
+
+
+Parser получает токены от lexer-а и строит AST — Abstract Syntax Tree.
+
+
+
+AST показывает структуру программы:
+
+
+
+\- функции;
+
+\- параметры;
+
+\- блоки;
+
+\- переменные;
+
+\- выражения;
+
+\- if/else;
+
+\- while;
+
+\- for;
+
+\- return;
+
+\- function calls.
+
+
+
+Пример:
+
+
+
+```c
+
+fn main() -> int {
+
+&#x20;   int x = 10;
+
+&#x20;   return x;
+
+}
+
+```
+
+
+
+AST будет описывать:
+
+
+
+```text
+
+Program
+
+&#x20; FunctionDecl main -> int
+
+&#x20;   Block
+
+&#x20;     VarDecl int x = 10
+
+&#x20;     Return x
+
+```
+
+
+
+\## Команды проверки
+
+
+
+Вывести AST в консоль:
+
+
+
+```bash
+
+./build/compiler parse --input examples/hello.src --ast-format text
+
+```
+
+
+
+Сохранить AST в файл:
+
+
+
+```bash
+
+./build/compiler parse --input examples/hello.src --ast-format text --output ast.txt
+
+cat ast.txt
+
+```
+
+
+
+Сгенерировать AST в Graphviz DOT:
+
+
+
+```bash
+
+./build/compiler parse --input examples/hello.src --ast-format dot --output ast.dot
+
+```
+
+
+
+Сделать картинку AST:
+
+
+
+```bash
+
 dot -Tpng ast.dot -o ast.png
 
-
-
-После этого появится картинка:
-
-
-
-ast.png
-
-Что демонстрирует Sprint 2
-
-recursive descent parser;
-
-построение AST;
-
-обработку функций;
-
-обработку блоков;
-
-обработку if/else, while, for;
-
-обработку выражений с приоритетами операторов;
-
-вывод AST в text и DOT.
-
-Sprint 3 — Semantic Analysis / Семантический анализ
+```
 
 
 
-На этом этапе компилятор проверяет смысл программы.
+\## Что показать преподавателю
 
 
 
-Например:
+Команда:
 
 
 
-объявлена ли переменная;
+```bash
 
-нет ли повторного объявления;
+./build/compiler parse --input examples/hello.src --ast-format text
 
-совпадают ли типы;
+```
 
-правильно ли вызываются функции;
 
-правильный ли тип возвращает return;
 
-boolean ли условие в if / while.
+Пояснение:
 
-Запустить semantic check
+
+
+```text
+
+Parser строит AST, то есть дерево синтаксической структуры программы.
+
+В отличие от lexer-а, parser уже понимает вложенность блоков, функций и выражений.
+
+```
+
+
+
+\---
+
+
+
+\# Sprint 3 — Semantic Analysis
+
+
+
+\## Что реализовано
+
+
+
+В Sprint 3 был реализован семантический анализ.
+
+
+
+Semantic analyzer проверяет смысл программы:
+
+
+
+\- объявлена ли переменная перед использованием;
+
+\- нет ли повторных объявлений в одной области видимости;
+
+\- совпадают ли типы;
+
+\- правильно ли вызываются функции;
+
+\- соответствует ли return типу функции;
+
+\- является ли условие в `if` / `while` boolean-выражением;
+
+\- корректны ли scope rules.
+
+
+
+Также реализованы:
+
+
+
+\- symbol table;
+
+\- type system;
+
+\- semantic error reporting;
+
+\- type annotations.
+
+
+
+\## Команды проверки
+
+
+
+Запустить semantic check:
+
+
+
+```bash
 
 ./build/compiler check --input examples/hello.src
 
-Запустить semantic check с выводом типов
+```
+
+
+
+Запустить semantic check с выводом типов:
+
+
+
+```bash
 
 ./build/compiler check --input examples/hello.src --show-types
 
-Вывести symbol table
+```
+
+
+
+Вывести symbol table:
+
+
+
+```bash
 
 ./build/compiler symbols --input examples/hello.src
 
-Сохранить symbol table в файл
+```
+
+
+
+Сохранить symbol table:
+
+
+
+```bash
 
 ./build/compiler symbols --input examples/hello.src --output symbols.txt
 
-
-
-Посмотреть:
-
-
-
 cat symbols.txt
 
-Что демонстрирует Sprint 3
-
-symbol table;
-
-области видимости;
-
-проверку типов;
-
-проверку функций;
-
-semantic errors;
-
-decorated/type-annotated AST.
-
-Sprint 4 — IR / Intermediate Representation
+```
 
 
 
-На этом этапе программа переводится в промежуточное представление — IR.
+\## Что показать преподавателю
 
 
 
-IR — это форма между AST и assembly.
-
-Она удобна для оптимизаций и дальнейшей генерации машинного кода.
+Команда:
 
 
 
-Пример IR-операций:
+```bash
+
+./build/compiler check --input examples/hello.src --show-types
+
+```
 
 
+
+Пояснение:
+
+
+
+```text
+
+На этом этапе компилятор проверяет программу не только синтаксически,
+
+но и семантически: типы, области видимости, объявления и return-выражения.
+
+```
+
+
+
+\---
+
+
+
+\# Sprint 4 — Intermediate Representation, IR
+
+
+
+\## Что реализовано
+
+
+
+В Sprint 4 был реализован IR — промежуточное представление.
+
+
+
+IR находится между AST и assembly.
+
+
+
+Он нужен для:
+
+
+
+\- более простой генерации машинного кода;
+
+\- оптимизаций;
+
+\- анализа control flow;
+
+\- представления программы в виде инструкций.
+
+
+
+Примеры IR-инструкций:
+
+
+
+```text
 
 ADD
 
@@ -344,6 +850,8 @@ DIV
 
 CMP\_GT
 
+CMP\_LE
+
 JUMP
 
 JUMP\_IF
@@ -352,143 +860,1461 @@ CALL
 
 RETURN
 
-Сгенерировать IR
+LOAD
+
+STORE
+
+ALLOCA
+
+```
+
+
+
+\## Команды проверки
+
+
+
+Сгенерировать IR:
+
+
+
+```bash
 
 ./build/compiler ir --input examples/factorial.src
 
-Сохранить IR в файл
+```
+
+
+
+Сохранить IR в файл:
+
+
+
+```bash
 
 ./build/compiler ir --input examples/factorial.src --output factorial.ir
 
-
-
-Посмотреть:
-
-
-
 cat factorial.ir
 
-Сгенерировать IR со статистикой
+```
+
+
+
+Показать IR со статистикой:
+
+
+
+```bash
 
 ./build/compiler ir --input examples/factorial.src --stats
 
-Сгенерировать IR и проверить control flow
+```
+
+
+
+Проверить control flow:
+
+
+
+```bash
 
 ./build/compiler ir --input examples/factorial.src --validate
 
-Полная команда для IR
+```
+
+
+
+Полная команда:
+
+
+
+```bash
 
 ./build/compiler ir --input examples/factorial.src --stats --validate
 
-Сгенерировать CFG в DOT
+```
+
+
+
+Сгенерировать CFG в DOT:
+
+
+
+```bash
 
 ./build/compiler ir --input examples/factorial.src --format dot --output cfg.dot
 
-Превратить CFG в PNG
-
 dot -Tpng cfg.dot -o cfg.png
 
-Что демонстрирует Sprint 4
-
-генерацию IR;
-
-basic blocks;
-
-control flow graph;
-
-временные переменные t1, t2, t3;
-
-инструкции ADD, SUB, MUL, CALL, RETURN;
-
-проверку корректности переходов.
-
-Sprint 5 — x86-64 Code Generation / Генерация Assembly
+```
 
 
 
-На этом этапе IR переводится в x86-64 assembly.
+\## Что показать преподавателю
 
 
 
-Backend генерирует:
+Команда:
 
 
 
-NASM syntax;
+```bash
 
-ELF64 object files;
+./build/compiler ir --input examples/factorial.src --stats --validate
 
-System V AMD64 ABI;
+```
 
-stack frame;
 
-function prologue/epilogue;
 
-вызовы функций;
+Пояснение:
 
-return values.
 
-Сгенерировать assembly
 
-./build/compiler compile --input tests/codegen/valid/function\_calls/add\_call.src --output add.asm --target x86\_64
+```text
 
-Сгенерировать assembly с картой stack frame
+IR показывает программу в виде промежуточных инструкций.
 
-./build/compiler compile --input tests/codegen/valid/function\_calls/add\_call.src --output add.asm --target x86\_64 --emit-stack-map
+Это уже не AST, но ещё не assembly. На этом уровне удобно делать оптимизации и строить CFG.
 
-Посмотреть assembly
+```
+
+
+
+\---
+
+
+
+\# Sprint 5 — x86-64 Code Generation
+
+
+
+\## Что реализовано
+
+
+
+В Sprint 5 был добавлен backend, который переводит IR в x86-64 assembly.
+
+
+
+Генератор поддерживает:
+
+
+
+\- NASM syntax;
+
+\- ELF64 object files;
+
+\- System V AMD64 ABI;
+
+\- function prologue;
+
+\- function epilogue;
+
+\- stack frame;
+
+\- передачу аргументов через ABI-регистры;
+
+\- return value через `rax`;
+
+\- arithmetic operations;
+
+\- function calls;
+
+\- runtime library.
+
+
+
+Добавленные компоненты:
+
+
+
+```text
+
+src/codegen/
+
+&#x20; abi.\*
+
+&#x20; stack\_frame.\*
+
+&#x20; register\_allocator.\*
+
+&#x20; x86\_generator.\*
+
+
+
+src/runtime/
+
+&#x20; runtime.asm
+
+```
+
+
+
+\## System V AMD64 ABI
+
+
+
+Первые 6 integer-аргументов передаются через регистры:
+
+
+
+```text
+
+1-й аргумент -> rdi
+
+2-й аргумент -> rsi
+
+3-й аргумент -> rdx
+
+4-й аргумент -> rcx
+
+5-й аргумент -> r8
+
+6-й аргумент -> r9
+
+```
+
+
+
+Возвращаемое значение передаётся через:
+
+
+
+```text
+
+rax
+
+```
+
+
+
+\## Stack frame
+
+
+
+Каждая функция генерирует prologue:
+
+
+
+```asm
+
+push rbp
+
+mov rbp, rsp
+
+sub rsp, N
+
+```
+
+
+
+И epilogue:
+
+
+
+```asm
+
+mov rsp, rbp
+
+pop rbp
+
+ret
+
+```
+
+
+
+Локальные переменные и временные значения хранятся относительно `rbp`:
+
+
+
+```asm
+
+\[rbp-8]
+
+\[rbp-16]
+
+\[rbp-24]
+
+```
+
+
+
+\## Команды проверки Sprint 5
+
+
+
+Сгенерировать assembly:
+
+
+
+```bash
+
+./build/compiler compile \\
+
+&#x20; --input tests/codegen/valid/function\_calls/add\_call.src \\
+
+&#x20; --output add.asm \\
+
+&#x20; --target x86\_64 \\
+
+&#x20; --emit-stack-map
+
+```
+
+
+
+Посмотреть assembly:
+
+
+
+```bash
 
 cat add.asm
 
-Собрать generated assembly в object file
+```
+
+
+
+Собрать object file:
+
+
+
+```bash
 
 nasm -f elf64 -o add.o add.asm
 
-Собрать runtime library
+```
+
+
+
+Собрать runtime:
+
+
+
+```bash
 
 nasm -f elf64 -o runtime.o src/runtime/runtime.asm
 
-Слинковать executable
+```
+
+
+
+Слинковать программу:
+
+
+
+```bash
 
 ld -o add\_program runtime.o add.o
 
-Запустить программу
+```
+
+
+
+Запустить:
+
+
+
+```bash
 
 ./add\_program
 
 echo $?
 
-
-
-Для файла:
-
-
-
-tests/codegen/valid/function\_calls/add\_call.src
+```
 
 
 
-ожидаемый результат:
+Ожидаемый результат:
 
 
+
+```text
 
 5
 
-
-
-Это значит, что программа реально выполнилась и вернула результат:
-
-
-
-2 + 3 = 5
-
-Полная демонстрация Sprint 5
+```
 
 
 
-Эти команды можно использовать при защите/проверке:
+\## Что это доказывает
 
 
+
+```text
+
+source code
+
+→ compiler
+
+→ x86-64 assembly
+
+→ object file
+
+→ executable
+
+→ program run
+
+```
+
+
+
+Если `echo $?` показывает `5`, значит программа реально выполнилась и вернула результат `2 + 3 = 5`.
+
+
+
+\---
+
+
+
+\# Sprint 6 — Control Flow и Short-Circuit
+
+
+
+\## Что реализовано
+
+
+
+Sprint 6 расширил backend для сложного control flow.
+
+
+
+Добавлена поддержка:
+
+
+
+\- `if`;
+
+\- `if-else`;
+
+\- nested conditionals;
+
+\- `while`;
+
+\- `for`;
+
+\- relational jumps;
+
+\- `\&\&`;
+
+\- `||`;
+
+\- `!`;
+
+\- short-circuit evaluation.
+
+
+
+Добавленные компоненты:
+
+
+
+```text
+
+src/codegen/
+
+&#x20; label\_manager.\*
+
+&#x20; control\_flow\_generator.\*
+
+&#x20; expression\_generator.\*
+
+```
+
+
+
+\## Что такое short-circuit
+
+
+
+Short-circuit — это способ вычисления логических выражений, при котором правая часть не вычисляется, если результат уже известен по левой части.
+
+
+
+Для `\&\&`:
+
+
+
+```text
+
+false \&\& X = false
+
+```
+
+
+
+Поэтому если левая часть false, правая часть не вычисляется.
+
+
+
+Для `||`:
+
+
+
+```text
+
+true || X = true
+
+```
+
+
+
+Поэтому если левая часть true, правая часть не вычисляется.
+
+
+
+\## Главный тест Sprint 6
+
+
+
+Файл:
+
+
+
+```bash
+
+cat tests/control\_flow/valid/logical\_ops/short\_circuit\_and.src
+
+```
+
+
+
+Содержит:
+
+
+
+```c
+
+fn main() -> int {
+
+&#x20;   int a = 0;
+
+&#x20;   int b = 10;
+
+&#x20;   if (a != 0 \&\& b / a > 2) {
+
+&#x20;       return 99;
+
+&#x20;   }
+
+&#x20;   return 5;
+
+}
+
+```
+
+
+
+Если short-circuit не работает, программа выполнит:
+
+
+
+```text
+
+b / a
+
+```
+
+
+
+то есть:
+
+
+
+```text
+
+10 / 0
+
+```
+
+
+
+и упадёт.
+
+
+
+Если short-circuit работает, правая часть не вычислится, и программа вернёт `5`.
+
+
+
+\## Команды проверки
+
+
+
+Сгенерировать assembly:
+
+
+
+```bash
+
+./build/compiler compile \\
+
+&#x20; --input tests/control\_flow/valid/logical\_ops/short\_circuit\_and.src \\
+
+&#x20; --output sc\_and.asm \\
+
+&#x20; --target x86\_64 \\
+
+&#x20; --emit-stack-map
+
+```
+
+
+
+Показать важные строки assembly:
+
+
+
+```bash
+
+grep -n "L\_logic\_false\\|L\_and\_rhs\\|idiv\\|je\\|jne\\|jmp" sc\_and.asm
+
+```
+
+
+
+Ожидаемо будет видно что-то похожее:
+
+
+
+```text
+
+je .main\_L\_logic\_false3
+
+jmp .main\_L\_and\_rhs1
+
+.main\_L\_and\_rhs1:
+
+idiv r10
+
+.main\_L\_logic\_false3:
+
+```
+
+
+
+Это значит:
+
+
+
+```text
+
+Если левая часть false, программа прыгает на L\_logic\_false.
+
+Инструкция idiv находится в правой ветке L\_and\_rhs и не выполняется.
+
+```
+
+
+
+Собрать и запустить:
+
+
+
+```bash
+
+nasm -f elf64 -o sc\_and.o sc\_and.asm
+
+nasm -f elf64 -o runtime.o src/runtime/runtime.asm
+
+ld -o sc\_and\_program runtime.o sc\_and.o
+
+
+
+./sc\_and\_program
+
+echo $?
+
+```
+
+
+
+Ожидаемый результат:
+
+
+
+```text
+
+5
+
+```
+
+
+
+\## Что показать преподавателю
+
+
+
+Главная демонстрация:
+
+
+
+```bash
+
+cat tests/control\_flow/valid/logical\_ops/short\_circuit\_and.src
+
+grep -n "L\_logic\_false\\|L\_and\_rhs\\|idiv\\|je\\|jmp" sc\_and.asm
+
+./sc\_and\_program
+
+echo $?
+
+```
+
+
+
+Пояснение:
+
+
+
+```text
+
+В исходнике есть потенциальное деление на ноль.
+
+Если short-circuit не работает, программа падает.
+
+Но она возвращает 5, а в assembly видно, что idiv находится в правой ветке,
+
+которая пропускается при false left operand.
+
+```
+
+
+
+\---
+
+
+
+\# Sprint 7 — Arrays, External Calls, Optimizations
+
+
+
+\## Что реализовано
+
+
+
+Sprint 7 добавил три больших направления:
+
+
+
+1\. массивы;
+
+2\. внешние вызовы функций из C library;
+
+3\. оптимизации IR.
+
+
+
+Добавленные файлы:
+
+
+
+```text
+
+src/ir/
+
+&#x20; optimizer.\*
+
+
+
+src/codegen/
+
+&#x20; array\_generator.\*
+
+&#x20; external\_calls.\*
+
+&#x20; optimization\_passes.\*
+
+
+
+src/libc/
+
+&#x20; stdlib.h
+
+```
+
+
+
+\---
+
+
+
+\## 7.1. Оптимизации
+
+
+
+Реализованы:
+
+
+
+\- constant folding;
+
+\- constant propagation;
+
+\- branch simplification;
+
+\- dead code elimination;
+
+\- optimization report.
+
+
+
+\### Constant Folding
+
+
+
+Пример:
+
+
+
+```c
+
+int x = 10 + 20;
+
+```
+
+
+
+После оптимизации:
+
+
+
+```c
+
+int x = 30;
+
+```
+
+
+
+\### Constant Propagation
+
+
+
+Пример:
+
+
+
+```c
+
+int x = 30;
+
+int y = x \* 2;
+
+```
+
+
+
+Компилятор понимает, что `x = 30`, и может заменить использование `x`.
+
+
+
+\### Branch Simplification
+
+
+
+Пример:
+
+
+
+```c
+
+if (60 > 50) {
+
+&#x20;   return 1;
+
+} else {
+
+&#x20;   return 0;
+
+}
+
+```
+
+
+
+Условие известно на этапе компиляции, поэтому можно заменить на прямой переход в true branch.
+
+
+
+\### Dead Code Elimination
+
+
+
+Если после оптимизаций какая-то ветка стала недостижимой, её можно удалить.
+
+
+
+\## Команды проверки оптимизаций
+
+
+
+```bash
+
+./build/compiler ir \\
+
+&#x20; --input tests/optimization/constant\_folding.src \\
+
+&#x20; --optimize \\
+
+&#x20; --optimization-report \\
+
+&#x20; --stats
+
+```
+
+
+
+Ожидаемый вывод содержит:
+
+
+
+```text
+
+Optimization Report:
+
+&#x20; Constant folding
+
+&#x20; Constant propagation
+
+&#x20; Branch simplification
+
+&#x20; Dead code elimination
+
+```
+
+
+
+Пример из проверки:
+
+
+
+```text
+
+Constant folding: 3 expression(s) folded
+
+Constant propagation: 9 use(s) replaced
+
+Branch simplification: 1 branch(es) simplified
+
+Dead code elimination: 6 instruction(s) removed
+
+```
+
+
+
+\---
+
+
+
+\## 7.2. Массивы
+
+
+
+Добавлена базовая поддержка static arrays.
+
+
+
+Пример:
+
+
+
+```c
+
+fn main() -> int {
+
+&#x20;   int arr\[3] = {1, 2, 3};
+
+&#x20;   arr\[1] = arr\[1] + 4;
+
+&#x20;   return arr\[0] + arr\[1] + arr\[2];
+
+}
+
+```
+
+
+
+Проверка:
+
+
+
+```bash
+
+./build/compiler compile \\
+
+&#x20; --input tests/arrays/valid/static\_array.src \\
+
+&#x20; --output array.asm \\
+
+&#x20; --target x86\_64 \\
+
+&#x20; --emit-stack-map
+
+
+
+nasm -f elf64 -o array.o array.asm
+
+nasm -f elf64 -o runtime.o src/runtime/runtime.asm
+
+ld -o array\_program runtime.o array.o
+
+
+
+./array\_program
+
+echo $?
+
+```
+
+
+
+Ожидаемый результат:
+
+
+
+```text
+
+10
+
+```
+
+
+
+Это доказывает:
+
+
+
+```text
+
+массив создан
+
+элементы записаны
+
+элемент arr\[1] изменён
+
+сумма посчитана правильно
+
+```
+
+
+
+\---
+
+
+
+\## 7.3. External Calls
+
+
+
+Добавлена поддержка вызова внешних функций, например `printf` из libc.
+
+
+
+Пример:
+
+
+
+```c
+
+extern int printf(string fmt, int value);
+
+
+
+fn main() -> int {
+
+&#x20;   printf("answer=%d\\n", 42);
+
+&#x20;   return 0;
+
+}
+
+```
+
+
+
+Проверка:
+
+
+
+```bash
+
+./build/compiler compile \\
+
+&#x20; --input tests/external\_calls/valid/printf\_demo.src \\
+
+&#x20; --output printf\_demo.asm \\
+
+&#x20; --target x86\_64
+
+
+
+nasm -f elf64 -o printf\_demo.o printf\_demo.asm
+
+gcc -no-pie -o printf\_demo printf\_demo.o
+
+
+
+./printf\_demo
+
+```
+
+
+
+Ожидаемый вывод:
+
+
+
+```text
+
+answer=42
+
+```
+
+
+
+Важно:
+
+
+
+```text
+
+Для printf используется gcc -no-pie, потому что printf приходит из libc.
+
+```
+
+
+
+\---
+
+
+
+\# Sprint 8 — Final CLI, Tests, Docs, Demo
+
+
+
+\## Что реализовано
+
+
+
+Sprint 8 — финальная полировка проекта.
+
+
+
+Добавлено:
+
+
+
+\- новый CLI `mycc`;
+
+\- `--help`;
+
+\- `--version`;
+
+\- режимы `-S`, `-c`, full compilation;
+
+\- `--ast`;
+
+\- `--ir`;
+
+\- `--optimize`;
+
+\- `--optimization-report`;
+
+\- diagnostics module;
+
+\- final tests;
+
+\- final demo;
+
+\- user guide;
+
+\- developer guide;
+
+\- error handling docs.
+
+
+
+Добавленные файлы:
+
+
+
+```text
+
+src/utils/
+
+&#x20; diagnostics.\*
+
+
+
+scripts/
+
+&#x20; run\_final\_tests.sh
+
+&#x20; build\_and\_run.sh
+
+
+
+docs/
+
+&#x20; user\_guide.md
+
+&#x20; developer\_guide.md
+
+&#x20; error\_handling.md
+
+&#x20; final\_demo.md
+
+
+
+tests/final/
+
+&#x20; good/
+
+&#x20; bad/
+
+
+
+demo/
+
+&#x20; final\_showcase.src
+
+```
+
+
+
+\## Новый CLI
+
+
+
+Показать help:
+
+
+
+```bash
+
+./build/mycc --help
+
+```
+
+
+
+Показать версию:
+
+
+
+```bash
+
+./build/mycc --version
+
+```
+
+
+
+Сгенерировать assembly:
+
+
+
+```bash
+
+./build/mycc -S demo/final\_showcase.src -o final\_showcase.asm --optimize
+
+```
+
+
+
+Сгенерировать object file:
+
+
+
+```bash
+
+./build/mycc -c demo/final\_showcase.src -o final\_showcase.o --optimize
+
+```
+
+
+
+Полная компиляция:
+
+
+
+```bash
+
+./build/mycc demo/final\_showcase.src -o final\_showcase --optimize -v
+
+```
+
+
+
+Запуск:
+
+
+
+```bash
+
+./final\_showcase
+
+echo $?
+
+```
+
+
+
+Ожидаемый вывод:
+
+
+
+```text
+
+final result=40
+
+0
+
+```
+
+
+
+\## Что демонстрирует final\_showcase
+
+
+
+Файл:
+
+
+
+```bash
+
+cat demo/final\_showcase.src
+
+```
+
+
+
+Демонстрирует:
+
+
+
+\- external call `printf`;
+
+\- массив;
+
+\- обращение к элементам массива;
+
+\- рекурсивную функцию `fact`;
+
+\- арифметические выражения;
+
+\- constant folding;
+
+\- успешное завершение программы.
+
+
+
+Логика:
+
+
+
+```text
+
+arr = {1, 2, 3, 4}
+
+sum = 1 + 2 + 3 + 4 = 10
+
+folded = 10 + 20 = 30
+
+sum + folded = 40
+
+```
+
+
+
+Поэтому программа печатает:
+
+
+
+```text
+
+final result=40
+
+```
+
+
+
+И возвращает:
+
+
+
+```text
+
+0
+
+```
+
+
+
+\## Финальная проверка Sprint 8
+
+
+
+```bash
+
+bash scripts/run\_final\_tests.sh
+
+```
+
+
+
+Ожидаемый результат:
+
+
+
+```text
+
+\[final-tests] all final tests passed
+
+```
+
+
+
+Проверка exit code:
+
+
+
+```bash
+
+echo $?
+
+```
+
+
+
+Ожидаемо:
+
+
+
+```text
+
+0
+
+```
+
+
+
+\---
+
+
+
+\# Полная команда для защиты
+
+
+
+Самая важная последовательность:
+
+
+
+```bash
 
 cd \~/projects/compiler
 
@@ -502,39 +2328,9 @@ ctest --test-dir build --output-on-failure
 
 
 
-./build/compiler compile --input tests/codegen/valid/function\_calls/add\_call.src --output add.asm --target x86\_64 --emit-stack-map
+bash scripts/run\_final\_tests.sh
 
-
-
-nasm -f elf64 -o add.o add.asm
-
-nasm -f elf64 -o runtime.o src/runtime/runtime.asm
-
-ld -o add\_program runtime.o add.o
-
-
-
-./add\_program
-
-echo $?
-
-
-
-Ожидаемый вывод:
-
-
-
-5
-
-Запуск всех тестов
-
-
-
-Все тесты проекта:
-
-
-
-ctest --test-dir build --output-on-failure
+```
 
 
 
@@ -542,89 +2338,385 @@ ctest --test-dir build --output-on-failure
 
 
 
-100% tests passed
+```text
+
+100% tests passed, 0 tests failed out of 5
+
+\[final-tests] all final tests passed
+
+```
 
 
 
-В проекте есть тесты для:
+Финальная demo-программа:
 
 
 
-lexer;
+```bash
 
-parser;
+./build/mycc demo/final\_showcase.src -o final\_showcase --optimize -v
 
-semantic analysis;
+./final\_showcase
 
-IR;
+echo $?
 
-codegen.
-
-Полезные быстрые команды
-
-Lexer
-
-./build/compiler lex --input examples/hello.src
-
-Parser
-
-./build/compiler parse --input examples/hello.src --ast-format text
-
-Semantic
-
-./build/compiler check --input examples/hello.src --show-types
-
-IR
-
-./build/compiler ir --input examples/factorial.src --stats --validate
-
-Codegen
-
-./build/compiler compile --input tests/codegen/valid/function\_calls/add\_call.src --output add.asm --target x86\_64 --emit-stack-map
-
-Runtime library
+```
 
 
 
-Для Sprint 5 нужен файл:
+Ожидаемо:
 
 
 
-src/runtime/runtime.asm
+```text
+
+final result=40
+
+0
+
+```
 
 
 
-Он содержит минимальную runtime library:
+\---
 
 
 
-\_start;
-
-exit;
-
-print\_int;
-
-print\_string;
-
-read\_int.
+\# Как посмотреть assembly
 
 
 
-Если в .gitignore есть правило:
+Для любого `.src` файла:
 
 
 
-\*.asm
+```bash
+
+./build/mycc -S demo/final\_showcase.src -o final\_showcase.asm --optimize
+
+cat final\_showcase.asm
+
+```
 
 
 
-то файл runtime может не добавиться автоматически.
+Или через старый интерфейс:
 
 
 
-Добавлять его надо так:
+```bash
+
+./build/compiler compile \\
+
+&#x20; --input demo/final\_showcase.src \\
+
+&#x20; --output final\_showcase.asm \\
+
+&#x20; --target x86\_64 \\
+
+&#x20; --emit-stack-map
 
 
+
+cat final\_showcase.asm
+
+```
+
+
+
+\---
+
+
+
+\# Как посмотреть IR
+
+
+
+```bash
+
+./build/mycc --ir demo/final\_showcase.src --optimize --optimization-report
+
+```
+
+
+
+Или:
+
+
+
+```bash
+
+./build/compiler ir \\
+
+&#x20; --input demo/final\_showcase.src \\
+
+&#x20; --optimize \\
+
+&#x20; --optimization-report \\
+
+&#x20; --stats
+
+```
+
+
+
+\---
+
+
+
+\# Как посмотреть AST
+
+
+
+```bash
+
+./build/mycc --ast demo/final\_showcase.src
+
+```
+
+
+
+Или:
+
+
+
+```bash
+
+./build/compiler parse --input demo/final\_showcase.src --ast-format text
+
+```
+
+
+
+\---
+
+
+
+\# Очистка временных файлов
+
+
+
+Удалить generated files:
+
+
+
+```bash
+
+rm -f \*.o
+
+rm -f \*.asm
+
+rm -f \*\_program
+
+rm -f final\_showcase
+
+rm -f final\_showcase.mycc.asm
+
+rm -f final\_showcase.mycc.o
+
+rm -f add\_program sc\_and\_program array\_program printf\_demo
+
+```
+
+
+
+Удалить build:
+
+
+
+```bash
+
+rm -rf build
+
+```
+
+
+
+\---
+
+
+
+\# Git
+
+
+
+Перед коммитом желательно удалить generated-файлы:
+
+
+
+```bash
+
+rm -f \*.o \*.asm \*\_program
+
+rm -f final\_showcase final\_showcase.mycc.asm final\_showcase.mycc.o
+
+```
+
+
+
+Проверить статус:
+
+
+
+```bash
+
+git status --short
+
+```
+
+
+
+Добавить изменения:
+
+
+
+```bash
+
+git add .
 
 git add -f src/runtime/runtime.asm
+
+```
+
+
+
+Коммит:
+
+
+
+```bash
+
+git commit -m "Final compiler implementation"
+
+```
+
+
+
+Push:
+
+
+
+```bash
+
+git push
+
+```
+
+
+
+Если GitHub просит пароль, нужно вставлять Personal Access Token, а не обычный пароль.
+
+
+
+\---
+
+
+
+\# Краткое описание архитектуры
+
+
+
+```text
+
+source file
+
+&#x20;  ↓
+
+lexer
+
+&#x20;  ↓
+
+tokens
+
+&#x20;  ↓
+
+parser
+
+&#x20;  ↓
+
+AST
+
+&#x20;  ↓
+
+semantic analyzer
+
+&#x20;  ↓
+
+decorated AST
+
+&#x20;  ↓
+
+IR generator
+
+&#x20;  ↓
+
+IR optimizer
+
+&#x20;  ↓
+
+x86-64 code generator
+
+&#x20;  ↓
+
+NASM assembly
+
+&#x20;  ↓
+
+object file
+
+&#x20;  ↓
+
+linked executable
+
+```
+
+
+
+\---
+
+
+
+\# Короткое объяснение проекта
+
+
+
+MiniCompiler — это учебный компилятор, который реализует полный pipeline компиляции:
+
+
+
+```text
+
+исходный код → токены → AST → semantic check → IR → optimization → x86-64 assembly → executable
+
+```
+
+
+
+К финальному спринту проект умеет:
+
+
+
+\- анализировать исходный код;
+
+\- строить AST;
+
+\- проверять типы и области видимости;
+
+\- генерировать IR;
+
+\- оптимизировать IR;
+
+\- генерировать x86-64 assembly;
+
+\- собирать исполняемый файл;
+
+\- поддерживать массивы;
+
+\- вызывать внешние функции вроде `printf`;
+
+\- выполнять short-circuit для `\&\&` и `||`;
+
+\- запускать финальный test suite одной командой.
+
+
 

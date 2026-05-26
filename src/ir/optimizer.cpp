@@ -257,7 +257,11 @@ bool Optimizer::eliminateDeadCode(IRProgram& program, OptimizationReport& report
                     continue;
                 }
                 kept.push_back(inst);
-                if (inst.isTerminator()) afterTerminator = true;
+                // Only an unconditional jump or return makes the following
+                // instructions in the same basic block unreachable. Conditional
+                // jumps still have a fall-through path, so removing the next
+                // instruction would break if/else and recursive functions.
+                if (inst.opcode == Opcode::JUMP || inst.opcode == Opcode::RETURN) afterTerminator = true;
             }
             block.instructions = std::move(kept);
         }

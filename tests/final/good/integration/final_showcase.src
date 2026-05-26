@@ -1,0 +1,24 @@
+extern int printf(string fmt, int value);
+
+fn factorial(int n) -> int {
+    if (n <= 1) {
+        return 1;
+    }
+    return n * factorial(n - 1);
+}
+
+fn main() -> int {
+    int arr[4] = {1, 2, 3, 4};
+    int sum = 0;
+    for (int i = 0; i < 4; i = i + 1) {
+        sum = sum + arr[i];
+    }
+
+    int fact = factorial(5);
+    int folded = 10 + 20;
+
+    printf("sum=%d\n", sum);
+    printf("fact=%d\n", fact);
+    printf("folded=%d\n", folded);
+    return sum;
+}

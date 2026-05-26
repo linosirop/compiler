@@ -15,6 +15,8 @@ add_library(compiler_core STATIC
     src/lexer/token.cpp
     src/lexer/lexer.cpp
 
+    src/utils/diagnostics.cpp
+
     src/parser/ast.cpp
     src/parser/parser.cpp
 
@@ -45,6 +47,9 @@ target_include_directories(compiler_core PUBLIC src)
 
 add_executable(compiler src/main.cpp)
 target_link_libraries(compiler PRIVATE compiler_core)
+
+add_executable(mycc src/main.cpp)
+target_link_libraries(mycc PRIVATE compiler_core)
 
 option(BUILD_TESTS "Build MiniCompiler tests" OFF)
 

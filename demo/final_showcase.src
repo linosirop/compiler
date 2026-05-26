@@ -1,0 +1,19 @@
+extern int printf(string fmt, int value);
+
+fn fact(int n) -> int {
+    if (n <= 1) {
+        return 1;
+    }
+    return n * fact(n - 1);
+}
+
+fn main() -> int {
+    int arr[4] = {1, 2, 3, 4};
+    int sum = arr[0] + arr[1] + arr[2] + arr[3];
+    int f = fact(5);
+    int folded = 10 + 20;
+
+    printf("final result=%d\n", sum + folded);
+
+    return 0;
+}
